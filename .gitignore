@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+
+# local-only: original brief + raw audio originals (copies live in evidence/)
+Cohort7CodePath_ HackathonHandbook.md
+/Eddie.m4a
+/Hansh_Interview.m4a
