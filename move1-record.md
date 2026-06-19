@@ -31,20 +31,45 @@ Track A: The Concept Check. I act as the tool myself, before any app exists.
 
 ---
 
-## Person 2 _(to do)_
+## Person 2 — Hansh Goel
 
-- **Name / consent:** _[fill name]_ — consent: _[yes/no]_
-- **Concept tested:** _[pick from list]_
-- **Raw record:** _[link]_
+- **Name / consent:** Hansh Goel — consent: yes (recorded, told purpose at end)
+- **Concept tested:** why a backend exists → interface → API → authentication / authorization
+- **Raw record:** voice memo "Andheri East.m4a" (transcribed via Groq Whisper)
+- **Note:** Whisper garbled the Hindi/Hinglish opening into broken Devanagari; the English
+  bulk (his derivation) transcribed cleanly and is the usable record.
 
 ### How it went
-- Opening question + their first derivation: _[fill]_
-- The sentence where it became a label: _[fill]_
-- Follow-up used: _[fill]_
-- Could they derive after? _[yes/no + what they said]_
+- Derived **why a backend exists** from first principles, unprompted: a server takes the load
+  of multiple users, data is secured, and — his core point — a company keeps its **business
+  logic private** ("otherwise anyone could copy any company easily"). Used ChatGPT as his own
+  example: the big model cannot run on a user's device.
+- Derived **interface** correctly: "a medium, not a specific software — a medium between the
+  user and the service provider." Frontend = the interface sitting on his device.
+- Derived **API** correctly: application programming interface, a medium / point of interaction
+  between two objects (his phone and the servers).
+- Derived **authentication vs authorization** correctly and kept them distinct: auth = proving
+  you are who you claim; authz = rules/limits (free vs paid plan, rate limits). Explained the
+  **API key as the authentication layer** for an external provider.
+- Spontaneously named the **deterministic vs probabilistic split** himself when describing how
+  he'd build a chatbot (deterministic backend APIs vs the probabilistic LLM "brain").
+
+### Verdict
+- **The sentence where understanding became a label:** none found.
+- **Could he derive after?** N/A — **no gap to expose.** He derived every concept cleanly under
+  repeated "how does it actually work / what's underneath" pressure. Interviewer stated on record:
+  "couldn't find any loopholes... this product will not find a gap in your interface knowledge."
+- **Result:** clean PASS. This is a genuine "no gap exists for this person" case.
 
 ---
 
 ## Cross-read (the Move 1 insight)
-- Did both break at the same place? _[fill after Person 2]_
-- Pattern worth noting: _[fill]_
+- **Did both break at the same place?** No — opposite ends of the spectrum.
+  - Person 1: could not derive *why a backend exists* at all; fell back to "it's a social media thing."
+  - Person 2: derived backend, interface, API, and auth/authz cleanly from first principles.
+- **Pattern worth noting:** the two real people bracket the extremes (no-derivation vs
+  full-derivation). Neither hit the hypothesis's sweet spot — *can define but cannot derive,
+  then closes the gap once it is named*. That case has not appeared yet, which directly
+  pressures the Move 2 bet and is honest signal to report.
+- **Implication for Move 5:** likely need a third person who sits in the middle (defines the
+  words, stalls on the why) to actually test the before→after gap-close the tool is built around.
