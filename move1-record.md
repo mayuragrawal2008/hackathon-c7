@@ -73,3 +73,55 @@ Track A: The Concept Check. I act as the tool myself, before any app exists.
   pressures the Move 2 bet and is honest signal to report.
 - **Implication for Move 5:** likely need a third person who sits in the middle (defines the
   words, stalls on the why) to actually test the before→after gap-close the tool is built around.
+
+---
+
+## Person 3 — Eddie
+
+- **Name / consent:** Eddie — consent: yes (asked and granted on recording)
+- **Concept tested:** why a backend exists (then interface, API) — via a WhatsApp peer-to-peer probe
+- **Raw record:** voice memo "Andheri East 2.m4a" (transcribed via Groq Whisper)
+- **Profile:** creative / diffusion-models background (Krea, Magnific), self-described "5/10 technical."
+
+### How it went
+- Derived the *idea* of a backend well **in his own words**:
+  > "The backend is the muscle and the skin and the organs of the internet. The internet is just
+  > a skeleton. All the data has to sit somewhere; the processing has to happen somewhere."
+- Stalled on the **WhatsApp peer-to-peer probe** (why a server if it's end-to-end / device-to-device).
+  Could not push it into technical terms; said "I don't fully understand the question."
+- Gave a workable plain-language take on interface ("a thing a user interacts with") and API
+  ("lets two systems send/receive info; they're also an interface") — but without precise jargon.
+- Had not read the brief, felt lost, asked to redo the call tomorrow with context.
+
+### Verdict — THE KEY FINDING (a documented surprise, found in Move 1)
+- **What I caught myself doing:** I was grading on whether he produced the *technical jargon I
+  expected*, not on whether he *understood*. I said this out loud on the recording:
+  > "what I'm expecting is technical jargon which I want to hear ... based on different personas
+  > of people it won't be right to say your explanation was correct or wrong. This is a very
+  > subjective problem."
+- Eddie pushed back: "what people say — they are correct in their own perception."
+- **Why it matters:** Eddie likely *derived* the concept (skeleton/muscle metaphor) but lacked
+  the *vocabulary*. My instinct flagged this as a "gap." That is a **FALSE gap** — penalising
+  understanding for missing words. It is the inverse of my hypothesis:
+  - Hypothesis: has the *words*, cannot *derive* (label without understanding).
+  - Eddie: *derives*, lacks the *words* (understanding without the label).
+- **Result:** ambiguous / false-gap risk. The single most important session for the design.
+
+---
+
+## Cross-read — UPDATED with Person 3
+
+| Person | Derives the idea? | Has the jargon? | Tool's naive verdict |
+| ------ | ----------------- | --------------- | -------------------- |
+| P1 (her)    | No  | No  | gap (true) |
+| P2 (Hansh)  | Yes | Yes | no gap (true) |
+| P3 (Eddie)  | Yes (own words) | No | "gap" — but FALSE |
+
+- **The real Move 1 insight:** the hard problem is not finding where someone stops deriving.
+  It is telling apart *no understanding* from *understanding expressed without jargon*. A tool
+  that listens for vocabulary will mislabel the Eddie case every time — that is the exact
+  "soft/biased judge" failure the brief warns about, discovered live.
+- **Direct consequence for Move 3 (the boundary):** the probabilistic judge must test
+  *derivation of the why*, NOT presence of technical terms. The follow-up must force reasoning
+  ("why must it exist / what breaks without it"), and a correct plain-language answer must count
+  as a CLOSE even with zero jargon. This is the failure mode I now own on purpose.
