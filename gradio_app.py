@@ -134,6 +134,29 @@ EXPLAIN_SYS = """Give a concise, first-principles explanation of the concept, in
 language (4-6 sentences). Focus on WHY it must exist and what concretely breaks without
 it — the causal story, not a jargon dump. Plain text only, no markdown headers."""
 
+# Socratic tutor: leads the learner to derive the WHY themselves through questions only.
+SOCRATIC_SYS = RULES + """
+
+You are a SOCRATIC TUTOR. Lead the learner to DERIVE the concept's WHY entirely by
+themselves, using questions only.
+TUTOR RULES:
+- NEVER state the answer, give facts, or say "correct/wrong" mid-dialogue.
+- Ask exactly ONE short question per turn. Build on what the learner JUST said. Push for
+  the cause ("why must that be true?", "what breaks if it weren't?"), and probe deeper
+  wherever they are vague or circular. Adapt to their answers.
+- Using the rigor rules above, judge whether across the WHOLE dialogue the LEARNER has now
+  themselves stated the explicit cause->effect WHY (not you).
+Return JSON:
+{"derived": bool, "proof_sentence": str, "next_question": str, "used_jargon": bool}
+- derived=true ONLY when they articulated the causal why themselves -> next_question="".
+- derived=false -> next_question = the single next Socratic question."""
+
+
+def socratic_step(concept_prompt, dialogue):
+    convo = "\n".join(f"{who.capitalize()}: {text}" for who, text in dialogue)
+    user = f"CONCEPT:\n{concept_prompt}\n\nDIALOGUE SO FAR:\n{convo}"
+    return groq_json(SOCRATIC_SYS, user)
+
 
 def groq_json(system, user):
     r = client.chat.completions.create(
@@ -158,9 +181,12 @@ def explain_concept(concept_prompt):
 
 
 # ---------- game state ----------
+MAX_TURNS = 5  # max Socratic questions before revealing
+
+
 def new_game():
     return {"xp": 0, "mastered": [], "badges": [], "streak": 0, "phase": "idle",
-            "concept": None, "exp1": "", "gap": "", "followup": "",
+            "concept": None, "exp1": "", "turns": 0, "dialogue": [],
             "session_id": None, "attempt_id": None}
 
 
@@ -247,10 +273,13 @@ def start_concept(concept_name, g, chat, auth):
         chat = chat + [{"role": "assistant", "content": "🔒 Please log in at the top first."}]
         return g, chat, stats_md(g), ""
     g = dict(g)
+    prompt = PROMPT_BY_NAME[concept_name]
     g["phase"] = "await_exp1"; g["concept"] = concept_name; g["exp1"] = ""
     g["session_id"] = None; g["attempt_id"] = None
+    g["turns"] = 0
+    g["dialogue"] = [("tutor", prompt)]
     chat = chat + [{"role": "assistant",
-                    "content": f"**{concept_name}**\n\n{PROMPT_BY_NAME[concept_name]}\n\n"
+                    "content": f"**{concept_name}**\n\n{prompt}\n\n"
                                f"Explain it from scratch — build up the *why*, don't just define it."}]
     return g, chat, stats_md(g), ""
 
@@ -276,21 +305,25 @@ def send(msg, g, chat, auth):
     cp = PROMPT_BY_NAME[g["concept"]]
     cid = CONCEPT_ID[g["concept"]]
 
+    # record the learner's turn in the dialogue
+    g["dialogue"] = list(g["dialogue"]) + [("learner", msg)]
+
+    # ----- FIRST explanation: open the Socratic session + persist -----
     if g["phase"] == "await_exp1":
         g["exp1"] = msg
-        out = groq_json(ANALYZE_SYS, f"CONCEPT:\n{cp}\n\nFIRST EXPLANATION:\n{msg}")
-        # persist (RLS: rows written with the user's token)
+        out = socratic_step(cp, g["dialogue"])
+        derived = bool(out.get("derived"))
         try:
             sess = sb_insert("sessions", {"concept_id": cid}, token)
             g["session_id"] = sess["id"]
             att = sb_insert("attempts", {
                 "session_id": sess["id"], "concept_id": cid, "explanation_1": msg,
-                "first_pass_closed": bool(out.get("first_pass_closed")),
-                "gap_named": out.get("gap_named", ""), "followup": out.get("followup", "")}, token)
+                "first_pass_closed": derived,
+                "gap_named": "", "followup": out.get("next_question", "")}, token)
             g["attempt_id"] = att["id"]
         except Exception:
             pass
-        if out.get("first_pass_closed"):
+        if derived:  # nailed it with no Socratic help
             g["xp"] += 100; g["streak"] += 1
             if g["concept"] not in g["mastered"]:
                 g["mastered"].append(g["concept"])
@@ -302,43 +335,58 @@ def send(msg, g, chat, auth):
             res = result_html("✅ Derived on the first try!", "win",
                               out.get("proof_sentence", ""), 100, g, explain_concept(cp))
             return g, chat, stats_md(g), "", res
-        g["gap"] = out.get("gap_named", "")
-        g["followup"] = out.get("followup", "")
-        g["phase"] = "await_exp2"
-        chat.append({"role": "assistant",
-                     "content": f"🟠 **Gap found**\n\n**Where it became a label:** {g['gap']}\n\n"
-                                f"**One question for you:** {g['followup']}\n\nReason it out 👇"})
+        # begin the Socratic dialogue
+        q = out.get("next_question", "") or "Why do you think that has to be the case?"
+        g["dialogue"].append(("tutor", q))
+        g["turns"] = 1
+        g["phase"] = "socratic"
+        chat.append({"role": "assistant", "content": f"🤔 {q}"})
         return g, chat, stats_md(g), "", ""
 
-    if g["phase"] == "await_exp2":
-        out = groq_json(JUDGE_SYS,
-                        f"CONCEPT:\n{cp}\n\nFIRST EXPLANATION:\n{g['exp1']}\n\n"
-                        f"GAP:\n{g['gap']}\n\nFOLLOW-UP:\n{g['followup']}\n\nSECOND EXPLANATION:\n{msg}")
-        g["phase"] = "idle"
-        closed = bool(out.get("gap_closed"))
-        try:
-            if g.get("attempt_id"):
-                sb_update("attempts", g["attempt_id"], {
-                    "explanation_2": msg, "gap_closed": closed,
-                    "proof_sentence": out.get("proof_sentence", "")}, token)
-        except Exception:
-            pass
-        if closed:
-            g["xp"] += 50; g["streak"] += 1
+    # ----- ongoing Socratic dialogue -----
+    if g["phase"] == "socratic":
+        out = socratic_step(cp, g["dialogue"])
+        derived = bool(out.get("derived"))
+        if derived:
+            g["phase"] = "idle"
+            gained = max(40, 90 - 10 * g["turns"])  # fewer questions -> more XP
+            g["xp"] += gained; g["streak"] += 1
             if g["concept"] not in g["mastered"]:
                 g["mastered"].append(g["concept"])
-            add_badge(g, "🔑 Gap Closer")
+            add_badge(g, "🦉 Socratic Thinker")
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
-            chat.append({"role": "assistant", "content": "✅ Gap closed!"})
-            res = result_html("✅ Gap closed!", "win", out.get("proof_sentence", ""), 50, g,
+            try:
+                if g.get("attempt_id"):
+                    sb_update("attempts", g["attempt_id"], {
+                        "explanation_2": msg, "gap_closed": True,
+                        "proof_sentence": out.get("proof_sentence", "")}, token)
+            except Exception:
+                pass
+            chat.append({"role": "assistant", "content": "✅ You reasoned your way there!"})
+            res = result_html("✅ You reasoned your way there!", "win",
+                              out.get("proof_sentence", ""), gained, g, explain_concept(cp))
+            return g, chat, stats_md(g), "", res
+
+        if g["turns"] >= MAX_TURNS:  # out of questions
+            g["phase"] = "idle"; g["streak"] = 0
+            try:
+                if g.get("attempt_id"):
+                    sb_update("attempts", g["attempt_id"], {
+                        "explanation_2": msg, "gap_closed": False, "proof_sentence": ""}, token)
+            except Exception:
+                pass
+            chat.append({"role": "assistant", "content": "We'll pause here — let's look at it together."})
+            res = result_html("🟡 Not quite — but here's the reasoning.", "lose", "", 0, g,
                               explain_concept(cp))
-        else:
-            g["streak"] = 0
-            chat.append({"role": "assistant", "content": "❌ Not closed."})
-            res = result_html("❌ Gap not closed — that didn't derive the why.", "lose", "", 0, g,
-                              explain_concept(cp))
-        return g, chat, stats_md(g), "", res
+            return g, chat, stats_md(g), "", res
+
+        # ask the next Socratic question
+        q = out.get("next_question", "") or "And why does that matter?"
+        g["dialogue"].append(("tutor", q))
+        g["turns"] += 1
+        chat.append({"role": "assistant", "content": f"🤔 {q}"})
+        return g, chat, stats_md(g), "", ""
 
     return g, chat, stats_md(g), "", ""
 
@@ -474,11 +522,11 @@ with gr.Blocks(title="Concept Check — Game") as demo:
              The one thing still yours is whether you can <b>derive a concept from scratch</b>.</p>
         </div>
         <div class='pitchcard'>
-          <b>How it works</b><br>
-          Log in, pick a systems concept, and explain it in your own words. The quiz-master
-          finds the exact spot your explanation becomes a memorized label, asks <b>one</b>
-          sharp question, and checks if you can now derive the <i>why</i> — judged on
-          reasoning, <b>not jargon</b>. Your progress is saved privately to your account.
+          <b>How it works — the Socratic way</b><br>
+          Log in, pick a systems concept, and explain it in your own words. A <b>Socratic
+          tutor</b> never hands you the answer — it asks one probing question at a time,
+          building on what you said, until <i>you</i> derive the <b>why</b> yourself. Judged
+          on reasoning, <b>not jargon</b>. Your progress is saved privately to your account.
           <div class='pillrow' style='margin-top:12px'>
             <span class='pill'>🔒 Private account</span>
             <span class='pill'>⭐ Earn XP</span>
@@ -509,7 +557,7 @@ with gr.Blocks(title="Concept Check — Game") as demo:
             start_btn = gr.Button("▶ Start", variant="primary", scale=1)
         with gr.Row():
             with gr.Column(scale=2):
-                gr.HTML("<div class='cc-caption'>💬 Quiz-Master</div>")
+                gr.HTML("<div class='cc-caption'>🦉 Socratic Tutor</div>")
                 chatbot = gr.Chatbot(height=400, show_label=False, elem_id="cc-chat")
                 with gr.Row():
                     box = gr.Textbox(placeholder="2) Type your explanation...", scale=4, show_label=False)
