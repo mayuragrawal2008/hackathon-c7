@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Concept Check</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto;
+         padding: 24px; line-height: 1.5; color: #111; }
+  h1 { margin-bottom: 4px; }
+  .sub { color: #666; margin-top: 0; }
+  textarea { width: 100%; min-height: 120px; padding: 10px; font-size: 15px;
+             border: 1px solid #ccc; border-radius: 8px; font-family: inherit; }
+  input, select, button { padding: 10px; font-size: 15px; border-radius: 8px;
+                          border: 1px solid #ccc; }
+  button { background: #111; color: #fff; border: none; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.secondary { background: #fff; color: #111; border: 1px solid #ccc; }
+  .card { border: 1px solid #e2e2e2; border-radius: 12px; padding: 16px; margin: 16px 0; }
+  .gap { background: #fff7ed; border-color: #fdba74; }
+  .pass { background: #ecfdf5; border-color: #6ee7b7; }
+  .fail { background: #fef2f2; border-color: #fca5a5; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .muted { color: #666; font-size: 14px; }
+  .hidden { display: none; }
+  label { font-weight: 600; display: block; margin: 12px 0 4px; }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #eee; }
+</style>
+</head>
+<body>
+  <h1>Concept Check</h1>
+  <p class="sub">Do you understand a concept, or just know the words for it?</p>
+
+  <!-- AUTH -->
+  <div id="auth" class="card">
+    <label>Email</label>
+    <input id="email" type="email" placeholder="you@example.com" style="width:100%" />
+    <label>Password</label>
+    <input id="password" type="password" placeholder="min 6 characters" style="width:100%" />
+    <div class="row" style="margin-top:12px">
+      <button id="loginBtn">Log in</button>
+      <button id="signupBtn" class="secondary">Sign up</button>
+      <span id="authMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="hidden">
+    <div class="row" style="justify-content:space-between">
+      <span class="muted">Signed in as <b id="who"></b></span>
+      <button id="logoutBtn" class="secondary">Log out</button>
+    </div>
+
+    <label>Pick a concept</label>
+    <select id="concept" style="width:100%"></select>
+
+    <div id="conceptPrompt" class="card muted"></div>
+
+    <label>Explain it from scratch — build up the <i>why</i>, don't just define it.</label>
+    <textarea id="exp1" placeholder="Type your explanation..."></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="analyzeBtn">Submit explanation</button>
+      <span id="analyzeMsg" class="muted"></span>
+    </div>
+
+    <!-- follow-up -->
+    <div id="followCard" class="card gap hidden">
+      <div><span class="pill">gap found</span></div>
+      <p><b>Where it became a label:</b> <span id="gapText"></span></p>
+      <p><b>One question for you:</b> <span id="followText"></span></p>
+      <label>Answer it — reason it out:</label>
+      <textarea id="exp2" placeholder="Your answer..."></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="judgeBtn">Submit answer</button>
+        <span id="judgeMsg" class="muted"></span>
+      </div>
+    </div>
+
+    <!-- verdict -->
+    <div id="verdict" class="card hidden"></div>
+
+    <hr style="margin:24px 0" />
+    <div class="row" style="justify-content:space-between">
+      <b>My past attempts</b>
+      <button id="refreshBtn" class="secondary">Refresh</button>
+    </div>
+    <div id="history" class="muted">—</div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://laeqihuhaokwnguzdepn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZXFpaHVoYW9rd25ndXpkZXBuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTY3ODQsImV4cCI6MjA5NzQ3Mjc4NH0.nWmoMzfdEffmT2AK1wtxdZ0tQZGokDlMcAn9kuoLyPY";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const $ = (id) => document.getElementById(id);
+let CONCEPTS = [];
+let currentSessionId = null;
+let currentAttemptId = null;
+
+// ---------- auth ----------
+$("signupBtn").onclick = async () => {
+  $("authMsg").textContent = "creating...";
+  const { error } = await sb.auth.signUp({ email: $("email").value, password: $("password").value });
+  $("authMsg").textContent = error ? error.message : "account created — now log in";
+};
+$("loginBtn").onclick = async () => {
+  $("authMsg").textContent = "logging in...";
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("authMsg").textContent = error.message;
+};
+$("logoutBtn").onclick = async () => { await sb.auth.signOut(); };
+
+sb.auth.onAuthStateChange((_e, session) => { render(session); });
+sb.auth.getSession().then(({ data }) => render(data.session));
+
+async function render(session) {
+  if (session) {
+    $("auth").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    $("who").textContent = session.user.email;
+    await loadConcepts();
+    await loadHistory();
+  } else {
+    $("auth").classList.remove("hidden");
+    $("app").classList.add("hidden");
+  }
+}
+
+// ---------- concepts ----------
+async function loadConcepts() {
+  const { data, error } = await sb.from("concepts").select("*").order("id");
+  if (error) { $("analyzeMsg").textContent = error.message; return; }
+  CONCEPTS = data;
+  $("concept").innerHTML = data.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  showPrompt();
+}
+$("concept").onchange = showPrompt;
+function showPrompt() {
+  const c = CONCEPTS.find(x => x.id == $("concept").value);
+  $("conceptPrompt").textContent = c ? c.prompt : "";
+}
+
+// ---------- analyze (first pass) ----------
+$("analyzeBtn").onclick = async () => {
+  const c = CONCEPTS.find(x => x.id == $("concept").value);
+  const exp1 = $("exp1").value.trim();
+  if (!exp1) { $("analyzeMsg").textContent = "write something first"; return; }
+  $("analyzeBtn").disabled = true; $("analyzeMsg").textContent = "thinking...";
+  resetCards();
+
+  // 1. create a session (deterministic record, RLS-protected)
+  const { data: sess, error: se } = await sb.from("sessions")
+    .insert({ concept_id: c.id }).select().single();
+  if (se) { $("analyzeMsg").textContent = se.message; $("analyzeBtn").disabled = false; return; }
+  currentSessionId = sess.id;
+
+  // 2. ask the boxed LLM judge
+  const res = await fetch("/analyze", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ concept_prompt: c.prompt, explanation_1: exp1 })
+  });
+  if (!res.ok) { $("analyzeMsg").textContent = "LLM error"; $("analyzeBtn").disabled = false; return; }
+  const out = await res.json();
+
+  // 3. store the attempt (the load-bearing record)
+  const { data: att, error: ae } = await sb.from("attempts").insert({
+    session_id: currentSessionId, concept_id: c.id,
+    explanation_1: exp1, first_pass_closed: out.first_pass_closed,
+    gap_named: out.gap_named, followup: out.followup
+  }).select().single();
+  if (ae) { $("analyzeMsg").textContent = ae.message; $("analyzeBtn").disabled = false; return; }
+  currentAttemptId = att.id;
+
+  $("analyzeMsg").textContent = "";
+  $("analyzeBtn").disabled = false;
+
+  if (out.first_pass_closed) {
+    showVerdict(true, "You derived the <i>why</i> on the first try — no gap.", out.proof_sentence);
+    await loadHistory();
+  } else {
+    $("gapText").textContent = out.gap_named;
+    $("followText").textContent = out.followup;
+    $("followCard").classList.remove("hidden");
+  }
+};
+
+// ---------- judge (second pass) ----------
+$("judgeBtn").onclick = async () => {
+  const c = CONCEPTS.find(x => x.id == $("concept").value);
+  const exp2 = $("exp2").value.trim();
+  if (!exp2) { $("judgeMsg").textContent = "write your answer"; return; }
+  $("judgeBtn").disabled = true; $("judgeMsg").textContent = "judging...";
+
+  const res = await fetch("/judge", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      concept_prompt: c.prompt, explanation_1: $("exp1").value.trim(),
+      gap_named: $("gapText").textContent, followup: $("followText").textContent,
+      explanation_2: exp2
+    })
+  });
+  if (!res.ok) { $("judgeMsg").textContent = "LLM error"; $("judgeBtn").disabled = false; return; }
+  const out = await res.json();
+
+  // update the attempt with the second pass result (gap -> result link)
+  const { error: ue } = await sb.from("attempts").update({
+    explanation_2: exp2, gap_closed: out.gap_closed, proof_sentence: out.proof_sentence
+  }).eq("id", currentAttemptId);
+  if (ue) { $("judgeMsg").textContent = ue.message; $("judgeBtn").disabled = false; return; }
+
+  $("judgeMsg").textContent = "";
+  $("judgeBtn").disabled = false;
+  $("followCard").classList.add("hidden");
+  showVerdict(out.gap_closed,
+    out.gap_closed ? "Gap closed — you derived the <i>why</i> after the follow-up."
+                   : "Gap not closed — the answer still didn't derive the <i>why</i>.",
+    out.proof_sentence);
+  await loadHistory();
+};
+
+// ---------- ui helpers ----------
+function showVerdict(pass, msg, proof) {
+  const v = $("verdict");
+  v.className = "card " + (pass ? "pass" : "fail");
+  v.innerHTML = `<p><b>${pass ? "PASS" : "NOT CLOSED"}</b> — ${msg}</p>` +
+                (proof ? `<p class="muted">Proof sentence: "${proof}"</p>` : "");
+  v.classList.remove("hidden");
+}
+function resetCards() {
+  $("followCard").classList.add("hidden");
+  $("verdict").classList.add("hidden");
+  $("exp2").value = "";
+}
+
+// ---------- history (proves RLS: only your own rows) ----------
+$("refreshBtn").onclick = loadHistory;
+async function loadHistory() {
+  const { data, error } = await sb.from("attempts")
+    .select("explanation_1, first_pass_closed, gap_closed, created_at, concept_id")
+    .order("created_at", { ascending: false });
+  if (error) { $("history").textContent = error.message; return; }
+  if (!data.length) { $("history").textContent = "no attempts yet"; return; }
+  $("history").innerHTML = data.map(a => {
+    const c = CONCEPTS.find(x => x.id == a.concept_id);
+    const result = a.gap_closed === true ? "✅ closed"
+                 : a.gap_closed === false ? "❌ not closed"
+                 : a.first_pass_closed ? "✅ first try" : "—";
+    return `<div class="card" style="padding:8px"><b>${c ? c.name : a.concept_id}</b>
+            — ${result}<br><span class="muted">${(a.explanation_1||"").slice(0,90)}...</span></div>`;
+  }).join("");
+}
+</script>
+</body>
+</html>
