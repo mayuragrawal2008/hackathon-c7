@@ -252,6 +252,11 @@ textarea, input[type=text], select, .gradio-container .wrap, .gradio-container .
 .gradio-container label, .gradio-container .label-wrap span,
 .gradio-container .block-label, .gradio-container span[data-testid="block-info"]{
   color:#7df9ff !important; opacity:1 !important; }
+/* kill the light pill behind component labels (e.g. "Quiz-master") */
+.gradio-container .label-wrap, .gradio-container .block-label,
+#cc-chat .label-wrap, #cc-chat .block-label{
+  background: transparent !important; border: none !important; box-shadow: none !important; }
+.gradio-container .block-label svg, #cc-chat .block-label svg{ fill:#7df9ff !important; color:#7df9ff !important; }
 /* dropdown menu styling */
 #concept-dd input, #concept-dd .wrap-inner, #concept-dd .secondary-wrap{
   background: var(--bg-soft) !important; color: var(--text-main) !important; }
@@ -342,7 +347,7 @@ with gr.Blocks(title="Concept Check — Game") as demo:
             start_btn = gr.Button("▶ Start", variant="primary", scale=1)
         with gr.Row():
             with gr.Column(scale=2):
-                chatbot = gr.Chatbot(height=420, label="Quiz-master", elem_id="cc-chat")
+                chatbot = gr.Chatbot(height=420, label="Quiz-Master", elem_id="cc-chat")
                 with gr.Row():
                     box = gr.Textbox(placeholder="2) Type your explanation...", scale=4, show_label=False)
                     send_btn = gr.Button("Send", variant="primary", scale=1)
