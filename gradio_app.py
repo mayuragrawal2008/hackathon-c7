@@ -299,16 +299,22 @@ def result_html(headline, klass, proof, gained, g, explanation=""):
     return body + stats_html(g)
 
 
-# ---------- auth handlers (content-only updates; hide login bar on success) ----------
+# ---------- auth handlers ----------
+# On success: reveal the "Continue" button (content update on a button = safe).
+# The big screen reveals (landing->login, login->play) are pure-visibility direct clicks.
 def do_auth(email, password, auth, signup):
     auth = dict(auth or {})
     if not email or not password:
-        return auth, "⚠️ Enter email and password.", gr.update(visible=True)
+        return auth, "⚠️ Enter your email and password first.", gr.update(visible=False)
     token, em, err = sb_auth(email.strip(), password, signup=signup)
     if token:
         auth["token"] = token; auth["email"] = em
-        return auth, f"✅ Logged in as **{em}** — your progress is saved privately.", gr.update(visible=False)
-    return auth, f"⚠️ {err or 'authentication failed'}", gr.update(visible=True)
+        return (auth, f"✅ Logged in as **{em}**. Click **Continue ▶** to start.",
+                gr.update(visible=True))
+    msg = err or "authentication failed"
+    if not signup and "Invalid" in msg:
+        msg += " — new here? use **Sign up** instead."
+    return auth, f"⚠️ {msg}", gr.update(visible=False)
 
 
 def do_login(email, password, auth):
@@ -319,9 +325,13 @@ def do_signup(email, password, auth):
     return do_auth(email, password, auth, signup=True)
 
 
-# ---------- game handlers ----------
-def enter_game():
-    return gr.update(visible=False), gr.update(visible=True)
+# ---------- screen transitions (pure visibility — the Gradio-safe reveal pattern) ----------
+def enter_login():
+    return gr.update(visible=False), gr.update(visible=True)  # landing -> login
+
+
+def go_play():
+    return gr.update(visible=False), gr.update(visible=True)  # login -> play
 
 
 def start_concept(concept_name, g, chat, auth):
@@ -457,12 +467,15 @@ def reset_all():
 
 
 def do_logout():
-    """Clear the session and bring back the login bar. Outputs:
-    auth, auth_status, login_bar, game, chatbot, stats, result_box, history_box, badges_earned."""
+    """Clear session, return to the login screen. Outputs:
+    auth, auth_status, continue_btn, login_view, play_view,
+    game, chatbot, stats, result_box, history_box, badges_earned."""
     g = new_game()
     return ({"token": None, "email": None},
-            "🔒 Logged out. Log in to play.",
-            gr.update(visible=True),
+            "🔒 Logged out. Log in to continue.",
+            gr.update(visible=False),   # hide Continue
+            gr.update(visible=True),    # show login_view (already mounted -> safe)
+            gr.update(visible=False),   # hide play_view
             g, [], stats_md(g), "", "", earned_html([]))
 
 
@@ -682,19 +695,30 @@ with gr.Blocks(title="Concept Check — Game") as demo:
         """)
         enter_btn = gr.Button("▶  Start Playing", variant="primary")
 
-    # -------- PLAY VIEW (single screen) --------
-    with gr.Column(visible=False) as play_view:
-        gr.HTML("<div id='cc-title'>🧩 Concept Check</div>")
-
-        # LOGIN BAR (hidden once logged in — hiding is safe in Gradio)
-        with gr.Row(elem_id="loginbar") as login_bar:
+    # -------- LOGIN SCREEN (its own page) --------
+    with gr.Column(visible=False) as login_view:
+        gr.HTML("<div id='cc-title'>🔐 Sign in to play</div>")
+        gr.HTML("""
+        <div class='pitchcard'>
+          <b>New here?</b> Enter an email + a password (min 6 characters) and click
+          <b>Sign up</b> — you're in instantly, no email verification.<br><br>
+          <b>Returning?</b> Enter the same email + password and click <b>Sign in</b>.<br><br>
+          <span style='color:#9fb0c8'>Your answers, XP and badges are saved privately to your
+          account (only you can see them).</span>
+        </div>
+        """)
+        with gr.Row(elem_id="loginbar"):
             login_email = gr.Textbox(label="Email", placeholder="you@example.com", scale=2)
             login_pw = gr.Textbox(label="Password", type="password", placeholder="min 6 chars", scale=2)
-            login_btn = gr.Button("Log in", variant="primary", scale=1)
-            signup_btn = gr.Button("Sign up", variant="secondary", scale=1)
-        auth_status = gr.Markdown("🔒 Log in to play — your answers are saved privately to your account.",
-                                  elem_id="cc-auth")
+        with gr.Row():
+            login_btn = gr.Button("🔑 Sign in", variant="primary")
+            signup_btn = gr.Button("✨ Sign up", variant="secondary")
+        auth_status = gr.Markdown("🔒 Enter your details and sign in / sign up.", elem_id="cc-auth")
+        continue_btn = gr.Button("▶ Continue to the game", variant="primary", visible=False)
 
+    # -------- PLAY VIEW (the game) --------
+    with gr.Column(visible=False) as play_view:
+        gr.HTML("<div id='cc-title'>🧩 Concept Check</div>")
         result_box = gr.HTML(elem_id="cc-result")
         with gr.Row(elem_id="topbar"):
             concept_dd = gr.Dropdown([n for n, _ in CONCEPTS], label="1) Pick a concept",
@@ -717,13 +741,15 @@ with gr.Blocks(title="Concept Check — Game") as demo:
                 history_box = gr.HTML()
 
     # -------- wiring --------
-    enter_btn.click(enter_game, None, [landing, play_view])
-    login_btn.click(do_login, [login_email, login_pw, auth], [auth, auth_status, login_bar]
-                    ).then(my_history, auth, history_box
-                    ).then(load_progress, [auth, game], [game, stats, badges_earned])
-    signup_btn.click(do_signup, [login_email, login_pw, auth], [auth, auth_status, login_bar]
-                     ).then(my_history, auth, history_box
-                     ).then(load_progress, [auth, game], [game, stats, badges_earned])
+    # landing -> login (pure-visibility reveal = safe)
+    enter_btn.click(enter_login, None, [landing, login_view])
+    # auth: content only (reveals the Continue button on success)
+    login_btn.click(do_login, [login_email, login_pw, auth], [auth, auth_status, continue_btn])
+    signup_btn.click(do_signup, [login_email, login_pw, auth], [auth, auth_status, continue_btn])
+    # login -> play (pure-visibility reveal), then load the user's progress
+    continue_btn.click(go_play, None, [login_view, play_view]
+                       ).then(load_progress, [auth, game], [game, stats, badges_earned]
+                       ).then(my_history, auth, history_box)
     start_btn.click(start_concept, [concept_dd, game, chatbot, auth], [game, chatbot, stats, result_box])
     send_btn.click(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box]
                    ).then(my_history, auth, history_box)
@@ -731,8 +757,8 @@ with gr.Blocks(title="Concept Check — Game") as demo:
                ).then(my_history, auth, history_box)
     reset_btn.click(reset_all, None, [game, chatbot, stats, box, result_box])
     logout_btn.click(do_logout, None,
-                     [auth, auth_status, login_bar, game, chatbot, stats, result_box,
-                      history_box, badges_earned])
+                     [auth, auth_status, continue_btn, login_view, play_view,
+                      game, chatbot, stats, result_box, history_box, badges_earned])
     hist_btn.click(my_history, auth, history_box)
 
 
