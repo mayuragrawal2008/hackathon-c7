@@ -177,7 +177,7 @@ $("analyzeBtn").onclick = async () => {
   $("analyzeBtn").disabled = false;
 
   if (out.first_pass_closed) {
-    showVerdict(true, "You derived the <i>why</i> on the first try — no gap.", out.proof_sentence);
+    showVerdict(true, "You derived the <i>why</i> on the first try — no gap.", out.proof_sentence, out.explanation);
     await loadHistory();
   } else {
     $("gapText").textContent = out.gap_named;
@@ -216,16 +216,17 @@ $("judgeBtn").onclick = async () => {
   showVerdict(out.gap_closed,
     out.gap_closed ? "Gap closed — you derived the <i>why</i> after the follow-up."
                    : "Gap not closed — the answer still didn't derive the <i>why</i>.",
-    out.proof_sentence);
+    out.proof_sentence, out.explanation);
   await loadHistory();
 };
 
 // ---------- ui helpers ----------
-function showVerdict(pass, msg, proof) {
+function showVerdict(pass, msg, proof, explanation) {
   const v = $("verdict");
   v.className = "card " + (pass ? "pass" : "fail");
   v.innerHTML = `<p><b>${pass ? "PASS" : "NOT CLOSED"}</b> — ${msg}</p>` +
-                (proof ? `<p class="muted">Proof sentence: "${proof}"</p>` : "");
+                (proof ? `<p class="muted">Proof sentence: "${proof}"</p>` : "") +
+                (explanation ? `<hr style="margin:10px 0"><p><b>📚 The full picture</b></p><p>${explanation}</p>` : "");
   v.classList.remove("hidden");
 }
 function resetCards() {

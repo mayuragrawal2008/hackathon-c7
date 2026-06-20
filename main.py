@@ -67,6 +67,11 @@ HARD RULES:
 - Do NOT be agreeable. Restating the term, giving a definition, listing features,
   or deflecting ("it's just how it works", "it's a social media thing") is NOT a
   derivation. If they did not state a cause->effect reason, it is NOT closed.
+- RIGOR: passing requires an EXPLICIT cause -> effect link — they must state what
+  happens AND the reason it follows (X, THEREFORE Y, BECAUSE ...). Merely naming an
+  outcome with no connecting mechanism is NOT enough. A vague one-liner that gestures
+  at a consequence but cannot say why it follows ("then everyone has their own
+  version") does NOT pass. Plain language is fine; a missing causal link is not.
 - Always return the exact sentence from THEIR text that proves your verdict, or ""
   if none exists.
 Return ONLY valid JSON. No prose outside the JSON."""
@@ -116,6 +121,28 @@ def groq_json(system: str, user: str) -> dict:
         raise HTTPException(status_code=502, detail=f"LLM error: {e}")
 
 
+# Post-verdict reinforcement (NOT an eval — generated only after the verdict, so it
+# never leaks the answer before judging).
+EXPLAIN_SYS = """Give a concise, first-principles explanation of the concept, in plain
+language (4-6 sentences). Focus on WHY it must exist and what concretely breaks without
+it — the causal story, not a jargon dump. Plain text only."""
+
+
+def explain_concept(concept_prompt: str) -> str:
+    try:
+        r = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": EXPLAIN_SYS},
+                {"role": "user", "content": f"CONCEPT:\n{concept_prompt}"},
+            ],
+            temperature=0.3,
+        )
+        return r.choices[0].message.content.strip()
+    except Exception:
+        return ""
+
+
 # ---------- routes ----------
 @app.post("/analyze")
 def analyze(inp: AnalyzeIn):
@@ -124,11 +151,14 @@ def analyze(inp: AnalyzeIn):
         f"LEARNER'S FIRST EXPLANATION:\n{inp.explanation_1}"
     )
     out = groq_json(ANALYZE_SYS, user)
+    first_pass = bool(out.get("first_pass_closed", False))
     return {
-        "first_pass_closed": bool(out.get("first_pass_closed", False)),
+        "first_pass_closed": first_pass,
         "gap_named": out.get("gap_named", "") or "",
         "followup": out.get("followup", "") or "",
         "proof_sentence": out.get("proof_sentence", "") or "",
+        # reinforcement only when the round ends here (first-try pass)
+        "explanation": explain_concept(inp.concept_prompt) if first_pass else "",
     }
 
 
@@ -145,6 +175,7 @@ def judge(inp: JudgeIn):
     return {
         "gap_closed": bool(out.get("gap_closed", False)),
         "proof_sentence": out.get("proof_sentence", "") or "",
+        "explanation": explain_concept(inp.concept_prompt),
     }
 
 
