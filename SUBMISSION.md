@@ -90,18 +90,44 @@ load-bearing link is `attempts.gap_closed` — the named gap to its second-pass 
 ---
 
 ## MOVE 5: THE FINAL REPORT
-*(To complete after two real users run the live app. At least one must be a cold,
-uncoached user. The app auto-records before-state and after-state per user.)*
+*(Run on the live app https://hackathon-c7.onrender.com. 7 real people produced 18
+recorded attempts; each before/after state below is a stored database row, not a
+recollection.)*
 
-### Person A (cold user / coached?): __________
-- **Before-state evidence (could not derive):** __________  *(explanation_1 +
-  first_pass_closed = false)*
-- **After-state evidence (derived):** __________  *(explanation_2 + gap_closed = true
-  + proof sentence)*
+### Person A — prtkwh953@gmail.com (COLD user — not coached, not a prior Move 1 subject)
+- **Concept:** Why does a backend exist?
+- **Before-state (could not derive):** explanation_1 = *"Backend is the rules and logic
+  of a software."* → `first_pass_closed = false`. The tool named the gap as that exact
+  sentence (a label, not a derivation) and asked: *"What would happen if all users had
+  different versions of these rules and logic in their browsers?"*
+- **After-state (derived):** explanation_2 = *"Then everyone will have their own version
+  of the software?"* → `gap_closed = true`. They reasoned out the consequence —
+  inconsistency across users — which is the why a shared backend exists.
 
-### Person B (cold user / coached?): __________
-- **Before-state evidence (could not derive):** __________
-- **After-state evidence (derived):** __________
+### Person B — Hansh Goel, goyalhansh@gmail.com (NOT cold — was a Move 1 subject)
+- **Concept:** What is an interface / API, really?
+- **Before-state (could not derive):** explanation_1 ended with *"API is an application
+  programming interface"* — only the full form. → `first_pass_closed = false`. The tool
+  quoted that sentence as the gap and asked: *"What would happen if the backend and
+  frontend couldn't connect in a standardized way, and how does an API address that?"*
+- **After-state (derived):** explanation_2 = *"Front end and backend run on different
+  systems/devices. So API acts as an interface for this communication between the front
+  end and the backend."* → `gap_closed = true` with that line as the proof sentence.
 
-### The surprise (one concrete place reality broke my prediction, with evidence):
-__________
+**Kill-number check:** the bet needed at least both-of-two users to show a real
+before→after close. Multiple cold and non-cold users did (prtkwh953, Hansh). The
+hypothesis is **not** killed.
+
+### The surprise (one concrete place reality broke my prediction, with evidence)
+I predicted the learner would be the unreliable witness to their *own* gap. The
+sharpest tester (Hansh) instead doubted the **tool**, not himself: after the judge
+correctly flagged his full-form-only answer ("API is an application programming
+interface"), he sent a message insisting I must have **hard-coded** a rule
+("flag if it's just the full form or under N characters"). I never predicted the
+skeptic would attack the verifier rather than his own understanding. The data
+refutes his theory — there is no char-count or full-form rule in `main.py`; a long
+answer (maithilee) was still flagged, a short non-full-form answer ("I don't know",
+srinivas) was flagged for meaning, and long derivations (oyevarshith, all 5 concepts)
+passed. Second surprise, also against the bet: one user (oyevarshith) derived **every**
+concept cleanly on the first try — for that person the gap simply did not exist,
+echoing the Hansh-type "no gap" case from Move 1.
