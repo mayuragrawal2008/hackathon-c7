@@ -116,6 +116,18 @@ def stats_md(g):
             f"🏅 **Badges:** {badges}")
 
 
+def stats_html(g):
+    lvl = level_name(g["xp"])
+    filled = len(set(g["mastered"]))
+    bar = "🟩" * filled + "⬜" * (5 - filled)
+    badges = "  ".join(g["badges"]) if g["badges"] else "—"
+    return (f"<div class='statsbox'>"
+            f"<div>🎮 <b>{lvl}</b> · ⭐ {g['xp']} XP</div>"
+            f"<div>Mastered: {bar} ({filled}/5)</div>"
+            f"<div>🔥 Streak: {g['streak']}</div>"
+            f"<div>🏅 Badges: {badges}</div></div>")
+
+
 def result_md(g, headline, klass, proof, gained):
     body = f"<div class='resultcard {klass}'>"
     body += f"<div class='resulthead'>{headline}</div>"
@@ -124,7 +136,7 @@ def result_md(g, headline, klass, proof, gained):
     if proof:
         body += f"<div class='proof'>“{proof}”</div>"
     body += "</div>"
-    return body + "\n\n" + stats_md(g)
+    return body + stats_html(g)
 
 
 # ---------- handlers ----------
@@ -268,6 +280,10 @@ ul.options li:hover, .options li.selected, .options li.active{
   background: rgba(0,242,254,0.18) !important; color:#7df9ff !important; }
 /* my own chatbot caption (replaces the white label pill) */
 .cc-caption{ color:#7df9ff !important; font-weight:700; font-size:1rem; padding:2px 2px 6px; }
+#cc-result{ min-height:80px; }
+.statsbox{ background:var(--bg-card); border:1px solid var(--border-glow); border-radius:12px;
+  padding:14px 16px; margin-top:6px; color:var(--text-main); line-height:1.8; }
+.statsbox b{ color:#7df9ff; }
 /* readable markdown */
 #cc-stats, #cc-stats *{ color: var(--text-main) !important; }
 /* titles */
@@ -360,7 +376,8 @@ with gr.Blocks(title="Concept Check — Game") as demo:
 
     # -------- SCREEN 3: RESULTS --------
     with gr.Column(visible=False) as results_screen:
-        results_md = gr.HTML()
+        gr.HTML("<div id='cc-title'>🏁 Round Result</div>")
+        results_md = gr.HTML(elem_id="cc-result")
         with gr.Row():
             next_btn = gr.Button("➡ Next concept", variant="primary")
             reset_btn2 = gr.Button("↺ Reset game", variant="secondary")
