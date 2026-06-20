@@ -54,6 +54,10 @@ HARD RULES:
   technical jargon is a PASS.
 - Do NOT be agreeable. Restating the term, defining it, listing features, or deflecting
   ("it's just how it works") is NOT a derivation.
+- RIGOR: passing requires an EXPLICIT cause -> effect link — state what happens AND the
+  reason it follows (X, THEREFORE Y, BECAUSE ...). Merely naming an outcome with no
+  connecting mechanism is NOT enough; a vague one-liner ("then everyone has their own
+  version") does NOT pass. Plain language is fine; a missing causal link is not.
 - Always quote the exact sentence from THEIR text that proves your verdict, or "".
 Return ONLY valid JSON."""
 
