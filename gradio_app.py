@@ -606,6 +606,10 @@ body > .options, body > ul.options{
   border-radius:14px; box-shadow: 0 0 18px rgba(0,242,254,0.08); }
 .pitchcard{ padding:16px 18px; margin:10px auto; max-width:620px; color:#dbe4f0; line-height:1.6; }
 #topbar, #loginbar{ padding:12px 14px; margin-bottom:12px; }
+/* lift the concept dropdown + its popup above the chat block */
+#topbar{ position:relative; z-index:200 !important; }
+#topbar .block, #concept-dd, #concept-dd *{ z-index:200 !important; }
+#concept-dd ul.options, #concept-dd .options{ z-index:9999 !important; }
 .pillrow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:6px 0 2px; }
 .pill{ background:rgba(0,242,254,0.10); border:1px solid var(--border-glow); color:#7df9ff;
   border-radius:999px; padding:4px 12px; font-size:.85rem; }
