@@ -1,11 +1,25 @@
 """Build SUBMISSION.pdf from SUBMISSION.md (images embedded) via headless Chromium."""
 import re
 import html
+import base64
+import subprocess
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent
 img_re = re.compile(r"(evidence/[A-Za-z0-9_\-]+\.(?:jpg|jpeg|png))")
+
+
+def data_uri(rel):
+    src = ROOT / rel
+    tmp = Path("/tmp") / f"_sub_{src.stem}.jpg"
+    # downscale to max 1400px + JPEG quality 72 so the PDF stays small
+    subprocess.run(["sips", "-Z", "1400", "-s", "format", "jpeg",
+                    "-s", "formatOptions", "72", str(src), "--out", str(tmp)],
+                   capture_output=True)
+    p = tmp if tmp.exists() else src
+    b64 = base64.b64encode(p.read_bytes()).decode()
+    return f"data:image/jpeg;base64,{b64}"
 
 body = []
 for raw in Path("SUBMISSION.md").read_text().splitlines():
@@ -15,7 +29,7 @@ for raw in Path("SUBMISSION.md").read_text().splitlines():
     if line.lstrip().startswith("*[") and "evidence/" in line:
         m = img_re.search(line)
         if m and (ROOT / m.group(1)).exists():
-            body.append(f"<img src='file://{ROOT / m.group(1)}'/>")
+            body.append(f"<img src='{data_uri(m.group(1))}'/>")
         continue
     if line.startswith("# "):
         body.append(f"<h1>{html.escape(line[2:])}</h1>")
