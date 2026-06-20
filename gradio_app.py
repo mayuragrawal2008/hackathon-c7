@@ -245,6 +245,22 @@ textarea, input[type=text], select, .gradio-container .wrap, .gradio-container .
 #cc-chat *{ color: var(--text-main) !important; }
 #cc-chat .user, #cc-chat .bot, #cc-chat .message{ background: rgba(5,5,8,0.55) !important;
           border: 1px solid rgba(0,242,254,0.18) !important; }
+/* hide chatbot's built-in toolbar icons + empty avatar squares */
+#cc-chat .icon-button-wrapper, #cc-chat .avatar-container,
+#cc-chat button[aria-label], #cc-chat .image-button{ display:none !important; }
+/* all component labels readable (Quiz-master, 1) Pick a concept, etc.) */
+.gradio-container label, .gradio-container .label-wrap span,
+.gradio-container .block-label, .gradio-container span[data-testid="block-info"]{
+  color:#7df9ff !important; opacity:1 !important; }
+/* dropdown menu styling */
+#concept-dd input, #concept-dd .wrap-inner, #concept-dd .secondary-wrap{
+  background: var(--bg-soft) !important; color: var(--text-main) !important; }
+ul.options, .options, #concept-dd ul{
+  background:#0a0c18 !important; color: var(--text-main) !important;
+  border:1px solid var(--border-glow) !important; }
+ul.options li, .options li{ color: var(--text-main) !important; background: transparent !important; }
+ul.options li:hover, .options li.selected, .options li.active{
+  background: rgba(0,242,254,0.18) !important; color:#7df9ff !important; }
 /* readable markdown */
 #cc-stats, #cc-stats *{ color: var(--text-main) !important; }
 /* titles */
@@ -322,7 +338,7 @@ with gr.Blocks(title="Concept Check — Game") as demo:
         # TOP BAR: concept picker + Start (so users start here, no confusion)
         with gr.Row(elem_id="topbar"):
             concept_dd = gr.Dropdown([n for n, _ in CONCEPTS], label="1) Pick a concept",
-                                     value=CONCEPTS[0][0], scale=4)
+                                     value=CONCEPTS[0][0], scale=4, elem_id="concept-dd")
             start_btn = gr.Button("▶ Start", variant="primary", scale=1)
         with gr.Row():
             with gr.Column(scale=2):
