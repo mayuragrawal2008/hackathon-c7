@@ -1,8 +1,8 @@
 """Concept Check — gamified Gradio chat UI (branch: gradio-ui).
 
-Standalone presentation layer over the same boxed LLM judge (Groq / Llama 3.3).
-The graded submission remains the baseline HTML app on `main` (which holds the
-auth + row-level-security proof). This version is the gamified demo for Move 5.
+Three screens: Landing -> Game -> Results. Standalone presentation layer over the
+same boxed LLM judge (Groq / Llama 3.3). The graded submission remains the baseline
+HTML app on `main` (which holds the auth + row-level-security proof).
 """
 import os
 import json
@@ -109,12 +109,27 @@ def stats_md(g):
     bar = "🟩" * filled + "⬜" * (5 - filled)
     badges = "  ".join(g["badges"]) if g["badges"] else "—"
     return (f"### 🎮 {lvl}  ·  ⭐ {g['xp']} XP{to_next}\n"
-            f"**Concepts mastered:** {bar}  ({filled}/5)\n\n"
+            f"**Mastered:** {bar}  ({filled}/5)\n\n"
             f"🔥 **Streak:** {g['streak']}\n\n"
             f"🏅 **Badges:** {badges}")
 
 
+def result_md(g, headline, klass, proof, gained):
+    body = f"<div class='resultcard {klass}'>"
+    body += f"<div class='resulthead'>{headline}</div>"
+    if gained:
+        body += f"<div class='xpgain'>+{gained} XP</div>"
+    if proof:
+        body += f"<div class='proof'>“{proof}”</div>"
+    body += "</div>"
+    return body + "\n\n" + stats_md(g)
+
+
 # ---------- handlers ----------
+def enter_game():
+    return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+
+
 def start_concept(concept_name, g, chat):
     g = dict(g)
     prompt = PROMPT_BY_NAME[concept_name]
@@ -130,13 +145,14 @@ def start_concept(concept_name, g, chat):
 def send(msg, g, chat):
     g = dict(g)
     msg = (msg or "").strip()
+    show_game, show_res = gr.update(visible=True), gr.update(visible=False)
     if not msg:
-        return g, chat, stats_md(g), ""
+        return g, chat, stats_md(g), "", "", show_game, show_res
     chat = chat + [{"role": "user", "content": msg}]
 
     if g["phase"] == "idle":
-        chat.append({"role": "assistant", "content": "Pick a concept above and hit **Start** first 🙂"})
-        return g, chat, stats_md(g), ""
+        chat.append({"role": "assistant", "content": "Pick a concept and hit **▶ Start** first 🙂"})
+        return g, chat, stats_md(g), "", "", show_game, show_res
 
     cp = PROMPT_BY_NAME[g["concept"]]
 
@@ -144,18 +160,17 @@ def send(msg, g, chat):
         g["exp1"] = msg
         out = groq_json(ANALYZE_SYS, f"CONCEPT:\n{cp}\n\nFIRST EXPLANATION:\n{msg}")
         if out.get("first_pass_closed"):
-            g["xp"] += 100
-            g["streak"] += 1
+            g["xp"] += 100; g["streak"] += 1
             if g["concept"] not in g["mastered"]:
                 g["mastered"].append(g["concept"])
             add_badge(g, "🥇 First-Try Genius")
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
             g["phase"] = "idle"
-            proof = out.get("proof_sentence", "")
-            chat.append({"role": "assistant",
-                         "content": f"✅ **Derived on the first try! +100 XP**\n\n"
-                                    f"_Proof:_ “{proof}”\n\nPick another concept to keep leveling up."})
+            chat.append({"role": "assistant", "content": "✅ Derived on the first try!"})
+            res = result_md(g, "✅ Derived on the first try!", "win",
+                            out.get("proof_sentence", ""), 100)
+            return g, chat, stats_md(g), "", res, gr.update(visible=False), gr.update(visible=True)
         else:
             g["gap"] = out.get("gap_named", "")
             g["followup"] = out.get("followup", "")
@@ -163,64 +178,132 @@ def send(msg, g, chat):
             chat.append({"role": "assistant",
                          "content": f"🟠 **Gap found**\n\n**Where it became a label:** {g['gap']}\n\n"
                                     f"**One question for you:** {g['followup']}\n\nReason it out 👇"})
-        return g, chat, stats_md(g), ""
+            return g, chat, stats_md(g), "", "", show_game, show_res
 
     if g["phase"] == "await_exp2":
         out = groq_json(JUDGE_SYS,
                         f"CONCEPT:\n{cp}\n\nFIRST EXPLANATION:\n{g['exp1']}\n\n"
                         f"GAP:\n{g['gap']}\n\nFOLLOW-UP:\n{g['followup']}\n\nSECOND EXPLANATION:\n{msg}")
+        g["phase"] = "idle"
         if out.get("gap_closed"):
-            g["xp"] += 50
-            g["streak"] += 1
+            g["xp"] += 50; g["streak"] += 1
             if g["concept"] not in g["mastered"]:
                 g["mastered"].append(g["concept"])
             add_badge(g, "🔑 Gap Closer")
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
-            proof = out.get("proof_sentence", "")
-            chat.append({"role": "assistant",
-                         "content": f"✅ **Gap closed! +50 XP**\n\n_Proof:_ “{proof}”\n\n"
-                                    f"🔥 Streak {g['streak']}. Pick another concept!"})
+            chat.append({"role": "assistant", "content": "✅ Gap closed!"})
+            res = result_md(g, "✅ Gap closed!", "win", out.get("proof_sentence", ""), 50)
         else:
             g["streak"] = 0
-            chat.append({"role": "assistant",
-                         "content": "❌ **Not yet** — that still didn't derive the *why*. "
-                                    "Streak reset. Try a different concept and come back to this one."})
-        g["phase"] = "idle"
-        return g, chat, stats_md(g), ""
+            chat.append({"role": "assistant", "content": "❌ Not closed."})
+            res = result_md(g, "❌ Gap not closed — that didn't derive the why.", "lose", "", 0)
+        return g, chat, stats_md(g), "", res, gr.update(visible=False), gr.update(visible=True)
 
-    return g, chat, stats_md(g), ""
+    return g, chat, stats_md(g), "", "", show_game, show_res
 
 
-def reset():
+def next_round():
+    return [], gr.update(visible=True), gr.update(visible=False)
+
+
+def reset_all():
     g = new_game()
-    return g, [], stats_md(g), ""
+    return (g, [], stats_md(g), "", "",
+            gr.update(visible=True), gr.update(visible=False), gr.update(visible=False))
 
 
-# ---------- UI ----------
+# ---------- palette + CSS (unique "neon dusk" vibe) ----------
+CSS = """
+.gradio-container { background: radial-gradient(1200px 600px at 20% -10%, #2a1a4a 0%, #120c24 45%, #0a0717 100%) !important;
+                    color: #ece9ff !important; }
+#hero { text-align:center; padding: 28px 18px 8px; }
+#hero h1 { font-size: 2.6rem; margin: 0; background: linear-gradient(90deg,#7af7d0,#9b8cff,#ff8ad1);
+           -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+#hero p { color:#bdb6e6; font-size:1.05rem; max-width:560px; margin:10px auto; }
+.pitchcard { background: rgba(255,255,255,.05); border:1px solid rgba(155,140,255,.35);
+             border-radius:16px; padding:16px 18px; margin:10px auto; max-width:620px; color:#ddd9ff; }
+.pillrow { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:6px 0 2px; }
+.pill { background:rgba(122,247,208,.12); border:1px solid rgba(122,247,208,.5);
+        color:#9af7d8; border-radius:999px; padding:4px 12px; font-size:.85rem; }
+.resultcard { border-radius:18px; padding:26px; text-align:center; margin:8px 0 14px;
+              border:1px solid rgba(255,255,255,.15); }
+.resultcard.win { background:linear-gradient(160deg, rgba(122,247,208,.16), rgba(155,140,255,.10)); }
+.resultcard.lose{ background:linear-gradient(160deg, rgba(255,138,138,.16), rgba(155,140,255,.08)); }
+.resulthead { font-size:1.6rem; font-weight:700; }
+.xpgain { font-size:2.2rem; font-weight:800; color:#7af7d0; margin:8px 0; }
+.proof { font-style:italic; color:#cfc8f5; margin-top:10px; }
+"""
+
+THEME = gr.themes.Soft(
+    primary_hue="purple", secondary_hue="emerald", neutral_hue="slate",
+    font=[gr.themes.GoogleFont("Poppins"), "sans-serif"],
+)
+
 with gr.Blocks(title="Concept Check — Game") as demo:
-    gr.Markdown("# 🧩 Concept Check\nDo you *understand* a concept, or just know the words? "
-                "Derive the **why** to earn XP, badges, and level up.")
     game = gr.State(new_game())
-    with gr.Row():
-        with gr.Column(scale=2):
-            chatbot = gr.Chatbot(height=420, label="Quiz-master")
-            with gr.Row():
-                box = gr.Textbox(placeholder="Type your explanation...", scale=4, show_label=False)
-                send_btn = gr.Button("Send", variant="primary", scale=1)
-        with gr.Column(scale=1):
-            stats = gr.Markdown(stats_md(new_game()))
-            concept_dd = gr.Dropdown([n for n, _ in CONCEPTS], label="Pick a concept",
-                                     value=CONCEPTS[0][0])
-            start_btn = gr.Button("▶ Start", variant="secondary")
-            reset_btn = gr.Button("↺ Reset game")
 
+    # -------- SCREEN 1: LANDING --------
+    with gr.Column(visible=True) as landing:
+        gr.HTML("""
+        <div id='hero'>
+          <h1>🧩 Concept Check</h1>
+          <p>Anyone can <i>recognize</i> the words — the model defines them for free.
+             The one thing still yours is whether you can <b>derive a concept from scratch</b>.</p>
+        </div>
+        <div class='pitchcard'>
+          <b>How it works</b><br>
+          Pick a systems concept. Explain it in your own words. The quiz-master finds the
+          exact spot your explanation becomes a memorized label, asks <b>one</b> sharp
+          question, and checks if you can now derive the <i>why</i> — judged on reasoning,
+          <b>not jargon</b>.
+          <div class='pillrow' style='margin-top:12px'>
+            <span class='pill'>⭐ Earn XP</span>
+            <span class='pill'>🏅 Unlock badges</span>
+            <span class='pill'>🔥 Build streaks</span>
+            <span class='pill'>🎮 Level up</span>
+          </div>
+        </div>
+        """)
+        enter_btn = gr.Button("▶  Start Playing", variant="primary")
+
+    # -------- SCREEN 2: GAME --------
+    with gr.Column(visible=False) as game_screen:
+        gr.Markdown("## 🧩 Concept Check")
+        with gr.Row():
+            with gr.Column(scale=2):
+                chatbot = gr.Chatbot(height=440, label="Quiz-master")
+                with gr.Row():
+                    box = gr.Textbox(placeholder="Type your explanation...", scale=4, show_label=False)
+                    send_btn = gr.Button("Send", variant="primary", scale=1)
+            with gr.Column(scale=1):
+                stats = gr.Markdown(stats_md(new_game()))
+                concept_dd = gr.Dropdown([n for n, _ in CONCEPTS], label="Pick a concept",
+                                         value=CONCEPTS[0][0])
+                start_btn = gr.Button("▶ Start", variant="secondary")
+                reset_btn = gr.Button("↺ Reset game")
+
+    # -------- SCREEN 3: RESULTS --------
+    with gr.Column(visible=False) as results_screen:
+        results_md = gr.HTML()
+        with gr.Row():
+            next_btn = gr.Button("➡ Next concept", variant="primary")
+            reset_btn2 = gr.Button("↺ Reset game")
+
+    # -------- wiring --------
+    enter_btn.click(enter_game, None, [landing, game_screen, results_screen])
     start_btn.click(start_concept, [concept_dd, game, chatbot], [game, chatbot, stats])
-    send_btn.click(send, [box, game, chatbot], [game, chatbot, stats, box])
-    box.submit(send, [box, game, chatbot], [game, chatbot, stats, box])
-    reset_btn.click(reset, None, [game, chatbot, stats, box])
+    send_btn.click(send, [box, game, chatbot],
+                   [game, chatbot, stats, box, results_md, game_screen, results_screen])
+    box.submit(send, [box, game, chatbot],
+               [game, chatbot, stats, box, results_md, game_screen, results_screen])
+    next_btn.click(next_round, None, [chatbot, game_screen, results_screen])
+    reset_btn.click(reset_all, None,
+                    [game, chatbot, stats, box, results_md, landing, game_screen, results_screen])
+    reset_btn2.click(reset_all, None,
+                     [game, chatbot, stats, box, results_md, landing, game_screen, results_screen])
 
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)),
-                theme=gr.themes.Soft())
+                css=CSS, theme=THEME)
