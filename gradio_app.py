@@ -237,6 +237,27 @@ def award_milestones(g):
         add_badge(g, "🎓 Polymath")
 
 
+# every badge in the game + how to earn it (for the hover menu)
+ALL_BADGES = [
+    ("🥇 First-Try Genius", "Derive the why on your first explanation"),
+    ("🦉 Socratic Thinker", "Reason to the why through the tutor's questions"),
+    ("⚡ One-Question Wonder", "Derive it after just one Socratic question"),
+    ("🧠 No-Jargon Master", "Derive it in plain language, no jargon"),
+    ("🔥 Hot Streak", "Win 3 rounds in a row"),
+    ("💎 Unstoppable", "Win 5 rounds in a row"),
+    ("🎓 Polymath", "Master all 15 concepts"),
+]
+
+
+def earned_html(badges):
+    if not badges:
+        inner = "<div style='color:#9fb0c8'>No badges yet — play to earn them!</div>"
+    else:
+        inner = "".join(f"<div>{b}</div>" for b in badges)
+    return ("<div class='statsbox'><div style='color:#7df9ff;font-weight:700;margin-bottom:6px'>"
+            f"🏅 Your badges</div>{inner}</div>")
+
+
 def _bar(g, segs=10):
     total = len(CONCEPTS)
     filled = len(set(g["mastered"]))
@@ -437,12 +458,12 @@ def reset_all():
 
 def do_logout():
     """Clear the session and bring back the login bar. Outputs:
-    auth, auth_status, login_bar, game, chatbot, stats, result_box, history_box."""
+    auth, auth_status, login_bar, game, chatbot, stats, result_box, history_box, badges_earned."""
     g = new_game()
     return ({"token": None, "email": None},
             "🔒 Logged out. Log in to play.",
             gr.update(visible=True),
-            g, [], stats_md(g), "", "")
+            g, [], stats_md(g), "", "", earned_html([]))
 
 
 def my_history(auth):
@@ -475,6 +496,37 @@ def my_history(auth):
                   f"<b style='color:#7df9ff'>{name}</b> — {badge}"
                   f"<br><span style='color:#9fb0c8;font-size:.85rem'>{snippet}…</span></div>")
     return f"<div class='statsbox'><div style='color:#7df9ff;font-weight:700;margin-bottom:6px'>📜 My past attempts</div>{items}</div>"
+
+
+def load_progress(auth, g):
+    """On login: rebuild prior badges / XP / mastery from the user's own history (RLS).
+    Outputs: game, stats, earned-badges HTML."""
+    token = auth.get("token") if auth else None
+    if not token:
+        return g, stats_md(g), earned_html([])
+    try:
+        url = (f"{SB_URL}/rest/v1/attempts?select=concept_id,first_pass_closed,gap_closed"
+               f"&order=created_at")
+        rows = _req("GET", url, {"apikey": SB_ANON, "Authorization": f"Bearer {token}"})
+    except Exception:
+        return g, stats_md(g), earned_html([])
+    g = dict(g)
+    mastered, badges, ft, soc = set(), [], 0, 0
+    for a in rows or []:
+        if a.get("first_pass_closed"):
+            ft += 1; mastered.add(a.get("concept_id"))
+        elif a.get("gap_closed"):
+            soc += 1; mastered.add(a.get("concept_id"))
+    if ft:
+        badges.append("🥇 First-Try Genius")
+    if soc:
+        badges.append("🦉 Socratic Thinker")
+    if len(mastered) >= len(CONCEPTS):
+        badges.append("🎓 Polymath")
+    g["mastered"] = [NAME_BY_ID[c] for c in mastered if c in NAME_BY_ID]
+    g["badges"] = badges
+    g["xp"] = 100 * ft + 60 * soc  # approx restore (turn counts aren't stored)
+    return g, stats_md(g), earned_html(badges)
 
 
 # ---------- palette + CSS (cyber-neon, from team_bash) ----------
@@ -562,7 +614,20 @@ ul.options li:hover, .options li.selected, .options li.active{
   100%{ transform:translateY(-115vh) rotate(320deg); opacity:0; } }
 /* keep interactive content above the floating layer */
 .gradio-container .block{ position:relative; z-index:1; }
+/* all-badges hover menu */
+.badge-help{ position:relative; display:inline-block; cursor:help; color:#7df9ff; font-weight:700;
+  border:1px solid var(--border-glow); border-radius:10px; padding:6px 10px; margin-top:8px; }
+.badge-tip{ display:none; position:absolute; right:0; bottom:120%; width:270px; z-index:50;
+  background:#0a0c18; border:1px solid var(--border-glow); border-radius:12px; padding:12px 14px;
+  box-shadow:0 0 22px rgba(0,242,254,.3); color:#e8edf6; font-weight:400; line-height:1.4; text-align:left; }
+.badge-tip > div{ margin-bottom:9px; } .badge-tip b{ color:#7df9ff; }
+.badge-help:hover .badge-tip{ display:block; }
 """
+
+BADGE_HELP_HTML = ("<div class='badge-help'>❓ Badges you can earn<div class='badge-tip'>"
+                   + "".join(f"<div><b>{n}</b><br><span style='color:#9fb0c8'>{h}</span></div>"
+                             for n, h in ALL_BADGES)
+                   + "</div></div>")
 
 import random as _random
 _BADGE_EMOJIS = ["🥇", "🦉", "⚡", "🧠", "🔥", "💎", "🎓", "🏅", "⭐", "🧩", "🔑", "🚀"]
@@ -636,6 +701,8 @@ with gr.Blocks(title="Concept Check — Game") as demo:
                     send_btn = gr.Button("Send", variant="primary", scale=1)
             with gr.Column(scale=1):
                 stats = gr.Markdown(stats_md(new_game()), elem_id="cc-stats")
+                badges_earned = gr.HTML(earned_html([]))
+                gr.HTML(BADGE_HELP_HTML)
                 reset_btn = gr.Button("↺ Reset game", variant="secondary")
                 logout_btn = gr.Button("🚪 Log out", variant="secondary")
                 hist_btn = gr.Button("📜 My history", variant="secondary")
@@ -644,9 +711,11 @@ with gr.Blocks(title="Concept Check — Game") as demo:
     # -------- wiring --------
     enter_btn.click(enter_game, None, [landing, play_view])
     login_btn.click(do_login, [login_email, login_pw, auth], [auth, auth_status, login_bar]
-                    ).then(my_history, auth, history_box)
+                    ).then(my_history, auth, history_box
+                    ).then(load_progress, [auth, game], [game, stats, badges_earned])
     signup_btn.click(do_signup, [login_email, login_pw, auth], [auth, auth_status, login_bar]
-                     ).then(my_history, auth, history_box)
+                     ).then(my_history, auth, history_box
+                     ).then(load_progress, [auth, game], [game, stats, badges_earned])
     start_btn.click(start_concept, [concept_dd, game, chatbot, auth], [game, chatbot, stats, result_box])
     send_btn.click(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box]
                    ).then(my_history, auth, history_box)
@@ -654,7 +723,8 @@ with gr.Blocks(title="Concept Check — Game") as demo:
                ).then(my_history, auth, history_box)
     reset_btn.click(reset_all, None, [game, chatbot, stats, box, result_box])
     logout_btn.click(do_logout, None,
-                     [auth, auth_status, login_bar, game, chatbot, stats, result_box, history_box])
+                     [auth, auth_status, login_bar, game, chatbot, stats, result_box,
+                      history_box, badges_earned])
     hist_btn.click(my_history, auth, history_box)
 
 
