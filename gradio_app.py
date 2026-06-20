@@ -53,6 +53,7 @@ CONCEPTS = [
 PROMPT_BY_NAME = {n: p for n, p in CONCEPTS}
 # DB concepts were seeded in this exact order -> ids 1..5
 CONCEPT_ID = {n: i + 1 for i, (n, _) in enumerate(CONCEPTS)}
+NAME_BY_ID = {i + 1: n for i, (n, _) in enumerate(CONCEPTS)}
 
 
 # ---------- Supabase REST helpers (auth + RLS-protected writes) ----------
@@ -347,6 +348,38 @@ def reset_all():
     return g, [], stats_md(g), "", ""
 
 
+def my_history(auth):
+    """Reads ONLY the logged-in user's own attempts (RLS via their token)."""
+    token = auth.get("token") if auth else None
+    if not token:
+        return "<div class='statsbox'>🔒 Log in to see your history.</div>"
+    try:
+        url = (f"{SB_URL}/rest/v1/attempts?select=concept_id,first_pass_closed,gap_closed,"
+               f"explanation_1,created_at&order=created_at.desc")
+        headers = {"apikey": SB_ANON, "Authorization": f"Bearer {token}"}
+        rows = _req("GET", url, headers)
+    except Exception:
+        return "<div class='statsbox'>Couldn't load history.</div>"
+    if not rows:
+        return "<div class='statsbox'>No attempts yet — play a round!</div>"
+    items = ""
+    for a in rows:
+        name = NAME_BY_ID.get(a.get("concept_id"), a.get("concept_id"))
+        if a.get("gap_closed") is True:
+            badge = "✅ closed"
+        elif a.get("gap_closed") is False:
+            badge = "❌ not closed"
+        elif a.get("first_pass_closed"):
+            badge = "✅ first try"
+        else:
+            badge = "… in progress"
+        snippet = (a.get("explanation_1") or "")[:70]
+        items += (f"<div style='border-bottom:1px solid rgba(0,242,254,.15);padding:6px 0'>"
+                  f"<b style='color:#7df9ff'>{name}</b> — {badge}"
+                  f"<br><span style='color:#9fb0c8;font-size:.85rem'>{snippet}…</span></div>")
+    return f"<div class='statsbox'><div style='color:#7df9ff;font-weight:700;margin-bottom:6px'>📜 My past attempts</div>{items}</div>"
+
+
 # ---------- palette + CSS (cyber-neon, from team_bash) ----------
 CSS = """
 :root{
@@ -484,15 +517,22 @@ with gr.Blocks(title="Concept Check — Game") as demo:
             with gr.Column(scale=1):
                 stats = gr.Markdown(stats_md(new_game()), elem_id="cc-stats")
                 reset_btn = gr.Button("↺ Reset game", variant="secondary")
+                hist_btn = gr.Button("📜 My history", variant="secondary")
+                history_box = gr.HTML()
 
     # -------- wiring --------
     enter_btn.click(enter_game, None, [landing, play_view])
-    login_btn.click(do_login, [login_email, login_pw, auth], [auth, auth_status, login_bar])
-    signup_btn.click(do_signup, [login_email, login_pw, auth], [auth, auth_status, login_bar])
+    login_btn.click(do_login, [login_email, login_pw, auth], [auth, auth_status, login_bar]
+                    ).then(my_history, auth, history_box)
+    signup_btn.click(do_signup, [login_email, login_pw, auth], [auth, auth_status, login_bar]
+                     ).then(my_history, auth, history_box)
     start_btn.click(start_concept, [concept_dd, game, chatbot, auth], [game, chatbot, stats, result_box])
-    send_btn.click(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box])
-    box.submit(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box])
+    send_btn.click(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box]
+                   ).then(my_history, auth, history_box)
+    box.submit(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box]
+               ).then(my_history, auth, history_box)
     reset_btn.click(reset_all, None, [game, chatbot, stats, box, result_box])
+    hist_btn.click(my_history, auth, history_box)
 
 
 if __name__ == "__main__":
