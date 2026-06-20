@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="Concept Check logo" width="200"/>
+</p>
+
 # Concept Check — Track A (100xEngineers Cohort 7 Hackathon)
 
 A tool that tells a learner whether they truly understand a systems concept, or only

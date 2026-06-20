@@ -1,0 +1,63 @@
+<svg width="320" height="320" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12142a"/>
+      <stop offset="1" stop-color="#05060a"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00f2fe"/>
+      <stop offset="1" stop-color="#4facfe"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#00f2fe" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#00f2fe" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <!-- tile -->
+  <rect x="6" y="6" width="308" height="308" rx="48" fill="url(#bg)" stroke="#00f2fe" stroke-opacity="0.35" stroke-width="2"/>
+  <rect x="6" y="6" width="308" height="308" rx="48" fill="url(#glow)"/>
+
+  <!-- nervous brain -->
+  <g transform="translate(120 150)">
+    <!-- brain body -->
+    <path d="M-58 6
+             C-66 -30 -34 -52 -8 -44
+             C0 -60 34 -58 42 -34
+             C70 -34 70 6 50 16
+             C56 40 24 56 4 44
+             C-18 60 -54 44 -50 18
+             C-58 16 -60 10 -58 6 Z"
+          fill="#ff8ad1" stroke="#c850a0" stroke-width="3"/>
+    <!-- brain squiggles -->
+    <path d="M-30 -28 C-18 -18 -30 -8 -16 2 M2 -36 C-6 -22 10 -16 0 -2 M28 -24 C16 -14 30 -4 18 8 M-24 22 C-10 16 -16 34 -2 30"
+          fill="none" stroke="#c850a0" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+    <!-- googly eyes -->
+    <circle cx="-14" cy="-6" r="12" fill="#fff"/>
+    <circle cx="18" cy="-6" r="12" fill="#fff"/>
+    <circle cx="-11" cy="-3" r="5" fill="#0a0c18"/>
+    <circle cx="21" cy="-3" r="5" fill="#0a0c18"/>
+    <!-- worried mouth -->
+    <path d="M-8 18 Q6 10 20 18" fill="none" stroke="#0a0c18" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- sweat drop (it's being checked!) -->
+  <path d="M196 96 C196 96 184 112 184 122 a12 12 0 0 0 24 0 C208 112 196 96 196 96 Z"
+        fill="#4facfe"/>
+
+  <!-- magnifying glass -->
+  <g>
+    <circle cx="206" cy="196" r="56" fill="#00f2fe" fill-opacity="0.06" stroke="url(#cyan)" stroke-width="9"/>
+    <circle cx="206" cy="196" r="56" fill="none" stroke="#00f2fe" stroke-opacity="0.4" stroke-width="9" filter="url(#soft)"/>
+    <line x1="247" y1="237" x2="286" y2="276" stroke="url(#cyan)" stroke-width="16" stroke-linecap="round"/>
+    <!-- glint -->
+    <path d="M186 176 q-10 10 -2 24" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="160" y="298" text-anchor="middle" font-family="Outfit, Segoe UI, sans-serif"
+        font-size="22" font-weight="800" fill="#7df9ff" letter-spacing="1">CONCEPT CHECK</text>
+</svg>
