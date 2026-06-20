@@ -3,6 +3,8 @@
 Three screens: Landing -> Game -> Results. Standalone presentation layer over the
 same boxed LLM judge (Groq / Llama 3.3). The graded submission remains the baseline
 HTML app on `main` (which holds the auth + row-level-security proof).
+
+Palette: cyber-neon (cyan/electric-blue) reused from the team_bash project.
 """
 import os
 import json
@@ -213,31 +215,74 @@ def reset_all():
             gr.update(visible=True), gr.update(visible=False), gr.update(visible=False))
 
 
-# ---------- palette + CSS (unique "neon dusk" vibe) ----------
+# ---------- palette + CSS (cyber-neon, from team_bash) ----------
 CSS = """
-.gradio-container { background: radial-gradient(1200px 600px at 20% -10%, #2a1a4a 0%, #120c24 45%, #0a0717 100%) !important;
-                    color: #ece9ff !important; }
-#hero { text-align:center; padding: 28px 18px 8px; }
-#hero h1 { font-size: 2.6rem; margin: 0; background: linear-gradient(90deg,#7af7d0,#9b8cff,#ff8ad1);
-           -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-#hero p { color:#bdb6e6; font-size:1.05rem; max-width:560px; margin:10px auto; }
-.pitchcard { background: rgba(255,255,255,.05); border:1px solid rgba(155,140,255,.35);
-             border-radius:16px; padding:16px 18px; margin:10px auto; max-width:620px; color:#ddd9ff; }
-.pillrow { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:6px 0 2px; }
-.pill { background:rgba(122,247,208,.12); border:1px solid rgba(122,247,208,.5);
-        color:#9af7d8; border-radius:999px; padding:4px 12px; font-size:.85rem; }
-.resultcard { border-radius:18px; padding:26px; text-align:center; margin:8px 0 14px;
-              border:1px solid rgba(255,255,255,.15); }
-.resultcard.win { background:linear-gradient(160deg, rgba(122,247,208,.16), rgba(155,140,255,.10)); }
-.resultcard.lose{ background:linear-gradient(160deg, rgba(255,138,138,.16), rgba(155,140,255,.08)); }
-.resulthead { font-size:1.6rem; font-weight:700; }
-.xpgain { font-size:2.2rem; font-weight:800; color:#7af7d0; margin:8px 0; }
-.proof { font-style:italic; color:#cfc8f5; margin-top:10px; }
+:root{
+  --bg-core:#050508; --bg-card:rgba(13,14,24,0.72); --bg-soft:rgba(5,5,8,0.6);
+  --border-glow:rgba(0,242,254,0.30); --primary:#00f2fe; --secondary:#4facfe;
+  --success:#00ff87; --danger:#ff0055; --text-main:#e2e8f0; --text-muted:#94a3b8;
+}
+.gradio-container{
+  background:
+    radial-gradient(circle at 12% 18%, rgba(0,242,254,0.07) 0%, transparent 42%),
+    radial-gradient(circle at 88% 82%, rgba(79,172,254,0.07) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(127,0,255,0.04) 0%, transparent 55%),
+    var(--bg-core) !important;
+  color: var(--text-main) !important;
+  font-family: 'Outfit', -apple-system, sans-serif !important;
+}
+.gradio-container .block, .gradio-container .form, .gradio-container .panel,
+.gradio-container .gr-group { background: transparent !important; border: none !important; }
+/* inputs + dropdowns */
+textarea, input[type=text], select, .gradio-container .wrap, .gradio-container .container input{
+  background: var(--bg-soft) !important; color: var(--text-main) !important;
+  border: 1px solid var(--border-glow) !important; border-radius: 10px !important;
+}
+::placeholder{ color: var(--text-muted) !important; }
+/* chatbot — kill the white box */
+#cc-chat{ background: var(--bg-card) !important; border: 1px solid var(--border-glow) !important;
+          border-radius: 14px !important; box-shadow: 0 0 18px rgba(0,242,254,0.10); }
+#cc-chat *{ color: var(--text-main) !important; }
+#cc-chat .user, #cc-chat .bot, #cc-chat .message{ background: rgba(5,5,8,0.55) !important;
+          border: 1px solid rgba(0,242,254,0.18) !important; }
+/* readable markdown */
+#cc-stats, #cc-stats *{ color: var(--text-main) !important; }
+/* titles */
+#hero h1, #cc-title{ font-weight:800; background: linear-gradient(135deg,#00f2fe,#4facfe);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+#cc-title{ font-size:1.7rem; padding:4px 2px 8px; }
+#hero{ text-align:center; padding:30px 18px 6px; }
+#hero h1{ font-size:2.7rem; margin:0; }
+#hero p{ color:var(--text-muted); font-size:1.05rem; max-width:560px; margin:10px auto; }
+/* cards */
+.pitchcard, #topbar{ background: var(--bg-card); border:1px solid var(--border-glow);
+  border-radius:14px; box-shadow: 0 0 18px rgba(0,242,254,0.08); }
+.pitchcard{ padding:16px 18px; margin:10px auto; max-width:620px; color:var(--text-main); }
+#topbar{ padding:12px 14px; margin-bottom:12px; }
+.pillrow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:6px 0 2px; }
+.pill{ background:rgba(0,242,254,0.10); border:1px solid var(--border-glow); color:#7df9ff;
+  border-radius:999px; padding:4px 12px; font-size:.85rem; }
+/* buttons */
+.gradio-container button.primary, .gradio-container .primary{
+  background: linear-gradient(135deg,#00f2fe,#4facfe) !important; color:#001018 !important;
+  border:none !important; box-shadow:0 0 16px rgba(0,242,254,0.40) !important; font-weight:700 !important; }
+.gradio-container button.secondary{ background: var(--bg-soft) !important;
+  color: var(--primary) !important; border:1px solid var(--border-glow) !important; }
+/* result cards */
+.resultcard{ border-radius:18px; padding:26px; text-align:center; margin:8px 0 14px;
+  border:1px solid var(--border-glow); }
+.resultcard.win{ background:linear-gradient(160deg, rgba(0,255,135,.14), rgba(0,242,254,.08));
+  box-shadow:0 0 22px rgba(0,255,135,.15); }
+.resultcard.lose{ background:linear-gradient(160deg, rgba(255,0,85,.14), rgba(127,0,255,.08));
+  box-shadow:0 0 22px rgba(255,0,85,.12); }
+.resulthead{ font-size:1.6rem; font-weight:700; color:var(--text-main); }
+.xpgain{ font-size:2.2rem; font-weight:800; color:var(--success); margin:8px 0; }
+.proof{ font-style:italic; color:#cfe9ff; margin-top:10px; }
 """
 
-THEME = gr.themes.Soft(
-    primary_hue="purple", secondary_hue="emerald", neutral_hue="slate",
-    font=[gr.themes.GoogleFont("Poppins"), "sans-serif"],
+THEME = gr.themes.Base(
+    primary_hue="cyan", secondary_hue="blue", neutral_hue="slate",
+    font=[gr.themes.GoogleFont("Outfit"), "sans-serif"],
 )
 
 with gr.Blocks(title="Concept Check — Game") as demo:
@@ -269,26 +314,28 @@ with gr.Blocks(title="Concept Check — Game") as demo:
 
     # -------- SCREEN 2: GAME --------
     with gr.Column(visible=False) as game_screen:
-        gr.Markdown("## 🧩 Concept Check")
+        gr.HTML("<div id='cc-title'>🧩 Concept Check</div>")
+        # TOP BAR: concept picker + Start (so users start here, no confusion)
+        with gr.Row(elem_id="topbar"):
+            concept_dd = gr.Dropdown([n for n, _ in CONCEPTS], label="1) Pick a concept",
+                                     value=CONCEPTS[0][0], scale=4)
+            start_btn = gr.Button("▶ Start", variant="primary", scale=1)
         with gr.Row():
             with gr.Column(scale=2):
-                chatbot = gr.Chatbot(height=440, label="Quiz-master")
+                chatbot = gr.Chatbot(height=420, label="Quiz-master", elem_id="cc-chat")
                 with gr.Row():
-                    box = gr.Textbox(placeholder="Type your explanation...", scale=4, show_label=False)
+                    box = gr.Textbox(placeholder="2) Type your explanation...", scale=4, show_label=False)
                     send_btn = gr.Button("Send", variant="primary", scale=1)
             with gr.Column(scale=1):
-                stats = gr.Markdown(stats_md(new_game()))
-                concept_dd = gr.Dropdown([n for n, _ in CONCEPTS], label="Pick a concept",
-                                         value=CONCEPTS[0][0])
-                start_btn = gr.Button("▶ Start", variant="secondary")
-                reset_btn = gr.Button("↺ Reset game")
+                stats = gr.Markdown(stats_md(new_game()), elem_id="cc-stats")
+                reset_btn = gr.Button("↺ Reset game", variant="secondary")
 
     # -------- SCREEN 3: RESULTS --------
     with gr.Column(visible=False) as results_screen:
         results_md = gr.HTML()
         with gr.Row():
             next_btn = gr.Button("➡ Next concept", variant="primary")
-            reset_btn2 = gr.Button("↺ Reset game")
+            reset_btn2 = gr.Button("↺ Reset game", variant="secondary")
 
     # -------- wiring --------
     enter_btn.click(enter_game, None, [landing, game_screen, results_screen])
