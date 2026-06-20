@@ -435,6 +435,16 @@ def reset_all():
     return g, [], stats_md(g), "", ""
 
 
+def do_logout():
+    """Clear the session and bring back the login bar. Outputs:
+    auth, auth_status, login_bar, game, chatbot, stats, result_box, history_box."""
+    g = new_game()
+    return ({"token": None, "email": None},
+            "🔒 Logged out. Log in to play.",
+            gr.update(visible=True),
+            g, [], stats_md(g), "", "")
+
+
 def my_history(auth):
     """Reads ONLY the logged-in user's own attempts (RLS via their token)."""
     token = auth.get("token") if auth else None
@@ -541,7 +551,29 @@ ul.options li:hover, .options li.selected, .options li.active{
   padding:16px 18px; margin:6px 0 12px; line-height:1.6; }
 .explainbox, .explainbox div{ color:#e8edf6 !important; }
 .explainhead{ color:#7df9ff !important; font-weight:700; margin-bottom:6px; }
+/* floating badges background */
+.float-bg{ position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+.float-bg span{ position:absolute; bottom:-60px; opacity:0; will-change:transform;
+  animation:floatUp linear infinite; filter:drop-shadow(0 0 6px rgba(0,242,254,.4)); }
+@keyframes floatUp{
+  0%{ transform:translateY(0) rotate(0deg); opacity:0; }
+  12%{ opacity:.5; }
+  88%{ opacity:.5; }
+  100%{ transform:translateY(-115vh) rotate(320deg); opacity:0; } }
+/* keep interactive content above the floating layer */
+.gradio-container .block{ position:relative; z-index:1; }
 """
+
+import random as _random
+_BADGE_EMOJIS = ["🥇", "🦉", "⚡", "🧠", "🔥", "💎", "🎓", "🏅", "⭐", "🧩", "🔑", "🚀"]
+_random.seed(7)
+_spans = "".join(
+    f"<span style='left:{_random.randint(2, 95)}%;font-size:{_random.randint(20, 40)}px;"
+    f"animation-duration:{_random.randint(16, 32)}s;animation-delay:-{_random.randint(0, 28)}s'>"
+    f"{_random.choice(_BADGE_EMOJIS)}</span>"
+    for _ in range(22)
+)
+FLOAT_HTML = f"<div class='float-bg'>{_spans}</div>"
 
 THEME = gr.themes.Base(
     primary_hue="cyan", secondary_hue="blue", neutral_hue="slate",
@@ -549,6 +581,7 @@ THEME = gr.themes.Base(
 )
 
 with gr.Blocks(title="Concept Check — Game") as demo:
+    gr.HTML(FLOAT_HTML)  # floating badges background (decorative)
     game = gr.State(new_game())
     auth = gr.State({"token": None, "email": None})
 
@@ -604,6 +637,7 @@ with gr.Blocks(title="Concept Check — Game") as demo:
             with gr.Column(scale=1):
                 stats = gr.Markdown(stats_md(new_game()), elem_id="cc-stats")
                 reset_btn = gr.Button("↺ Reset game", variant="secondary")
+                logout_btn = gr.Button("🚪 Log out", variant="secondary")
                 hist_btn = gr.Button("📜 My history", variant="secondary")
                 history_box = gr.HTML()
 
@@ -619,6 +653,8 @@ with gr.Blocks(title="Concept Check — Game") as demo:
     box.submit(send, [box, game, chatbot, auth], [game, chatbot, stats, box, result_box]
                ).then(my_history, auth, history_box)
     reset_btn.click(reset_all, None, [game, chatbot, stats, box, result_box])
+    logout_btn.click(do_logout, None,
+                     [auth, auth_status, login_bar, game, chatbot, stats, result_box, history_box])
     hist_btn.click(my_history, auth, history_box)
 
 
