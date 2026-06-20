@@ -49,6 +49,26 @@ CONCEPTS = [
      "From first principles, what ways exist to store data, and why do we need a database rather than just a file?"),
     ("Choosing a storage option",
      "How do you choose one storage option over another? Which factors decide it?"),
+    ("Why do we cache?",
+     "From first principles, why do systems cache data? What does caching trade off, and what breaks without it?"),
+    ("Why do APIs have rate limits?",
+     "Why would a service limit how many requests you can make? What breaks if there were no limit?"),
+    ("Why do we use HTTPS / encryption in transit?",
+     "Why encrypt data travelling over the internet? What exactly goes wrong if it's sent in plain text?"),
+    ("Why do we need a load balancer?",
+     "From first principles, why put a load balancer in front of servers? What breaks at scale without one?"),
+    ("Why do databases use indexes?",
+     "Why does a database need an index? What is the trade-off, and what happens to queries without one?"),
+    ("Why use a queue / async processing?",
+     "Why process some work asynchronously through a queue instead of doing it immediately? What breaks if everything is synchronous?"),
+    ("Why do we design servers to be stateless?",
+     "What does it mean for a server to be stateless, and why is that useful? What breaks if each server holds its own state?"),
+    ("Why do we version APIs?",
+     "Why give an API a version? What breaks for existing users if you change an API without versioning?"),
+    ("Why do we use a CDN?",
+     "From first principles, why serve content from a CDN? What problem does distance/geography create that a CDN solves?"),
+    ("Why hash passwords instead of storing them?",
+     "Why store a hash of a password rather than the password itself? What exactly is the danger of storing plain passwords?"),
 ]
 PROMPT_BY_NAME = {n: p for n, p in CONCEPTS}
 # DB concepts were seeded in this exact order -> ids 1..5
@@ -191,7 +211,7 @@ def new_game():
 
 
 LEVELS = [(0, "Novice"), (100, "Apprentice"), (250, "Systems Thinker"),
-          (450, "Architect"), (700, "Systems Sage")]
+          (450, "Architect"), (700, "Systems Sage"), (1000, "Grandmaster")]
 
 
 def level_name(xp):
@@ -207,25 +227,40 @@ def add_badge(g, badge):
         g["badges"].append(badge)
 
 
+def award_milestones(g):
+    """Streak / mastery badges, checked after a win."""
+    if g["streak"] >= 3:
+        add_badge(g, "🔥 Hot Streak")
+    if g["streak"] >= 5:
+        add_badge(g, "💎 Unstoppable")
+    if len(set(g["mastered"])) >= len(CONCEPTS):
+        add_badge(g, "🎓 Polymath")
+
+
+def _bar(g, segs=10):
+    total = len(CONCEPTS)
+    filled = len(set(g["mastered"]))
+    on = round(segs * filled / total) if total else 0
+    return "🟩" * on + "⬜" * (segs - on), filled, total
+
+
 def stats_md(g):
     lvl = level_name(g["xp"])
     nxt = next((t for t, _ in LEVELS if t > g["xp"]), None)
     to_next = f" · {nxt - g['xp']} XP to next level" if nxt else " · max level"
-    filled = len(set(g["mastered"]))
-    bar = "🟩" * filled + "⬜" * (5 - filled)
+    bar, filled, total = _bar(g)
     badges = "  ".join(g["badges"]) if g["badges"] else "—"
     return (f"### 🎮 {lvl}  ·  ⭐ {g['xp']} XP{to_next}\n"
-            f"**Mastered:** {bar}  ({filled}/5)\n\n🔥 **Streak:** {g['streak']}\n\n"
+            f"**Mastered:** {bar}  ({filled}/{total})\n\n🔥 **Streak:** {g['streak']}\n\n"
             f"🏅 **Badges:** {badges}")
 
 
 def stats_html(g):
     lvl = level_name(g["xp"])
-    filled = len(set(g["mastered"]))
-    bar = "🟩" * filled + "⬜" * (5 - filled)
+    bar, filled, total = _bar(g)
     badges = "  ".join(g["badges"]) if g["badges"] else "—"
     return (f"<div class='statsbox'><div>🎮 <b>{lvl}</b> · ⭐ {g['xp']} XP</div>"
-            f"<div>Mastered: {bar} ({filled}/5)</div><div>🔥 Streak: {g['streak']}</div>"
+            f"<div>Mastered: {bar} ({filled}/{total})</div><div>🔥 Streak: {g['streak']}</div>"
             f"<div>🏅 Badges: {badges}</div></div>")
 
 
@@ -330,6 +365,7 @@ def send(msg, g, chat, auth):
             add_badge(g, "🥇 First-Try Genius")
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
+            award_milestones(g)
             g["phase"] = "idle"
             chat.append({"role": "assistant", "content": "✅ Derived on the first try!"})
             res = result_html("✅ Derived on the first try!", "win",
@@ -354,8 +390,11 @@ def send(msg, g, chat, auth):
             if g["concept"] not in g["mastered"]:
                 g["mastered"].append(g["concept"])
             add_badge(g, "🦉 Socratic Thinker")
+            if g["turns"] == 1:
+                add_badge(g, "⚡ One-Question Wonder")
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
+            award_milestones(g)
             try:
                 if g.get("attempt_id"):
                     sb_update("attempts", g["attempt_id"], {

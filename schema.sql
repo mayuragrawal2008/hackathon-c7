@@ -67,5 +67,15 @@ insert into concepts (slug, name, prompt) values
 ('interface-api','What is an interface / API, really?','Explain what an interface is, and what an API is underneath the word — from first principles.'),
 ('frontend-backend','Frontend vs backend','What is a frontend, what is a backend, and why do we need both?'),
 ('storage-database','Why a database, not a file?','From first principles, what ways exist to store data, and why do we need a database rather than just a file?'),
-('choose-storage','Choosing a storage option','How do you choose one storage option over another? Which factors decide it?')
+('choose-storage','Choosing a storage option','How do you choose one storage option over another? Which factors decide it?'),
+('caching','Why do we cache?','From first principles, why do systems cache data? What does caching trade off, and what breaks without it?'),
+('rate-limit','Why do APIs have rate limits?','Why would a service limit how many requests you can make? What breaks if there were no limit?'),
+('https-encryption','Why do we use HTTPS / encryption in transit?','Why encrypt data travelling over the internet? What exactly goes wrong if it''s sent in plain text?'),
+('load-balancer','Why do we need a load balancer?','From first principles, why put a load balancer in front of servers? What breaks at scale without one?'),
+('db-index','Why do databases use indexes?','Why does a database need an index? What is the trade-off, and what happens to queries without one?'),
+('async-queue','Why use a queue / async processing?','Why process some work asynchronously through a queue instead of doing it immediately? What breaks if everything is synchronous?'),
+('statelessness','Why do we design servers to be stateless?','What does it mean for a server to be stateless, and why is that useful? What breaks if each server holds its own state?'),
+('api-versioning','Why do we version APIs?','Why give an API a version? What breaks for existing users if you change an API without versioning?'),
+('cdn','Why do we use a CDN?','From first principles, why serve content from a CDN? What problem does distance/geography create that a CDN solves?'),
+('password-hashing','Why hash passwords instead of storing them?','Why store a hash of a password rather than the password itself? What exactly is the danger of storing plain passwords?')
 on conflict (slug) do nothing;
