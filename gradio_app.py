@@ -69,6 +69,26 @@ JUDGE_SYS = RULES + """
 TASK: The learner answered a follow-up aimed at a gap. Decide if they NOW derived the why.
 Return JSON: {"gap_closed": bool, "proof_sentence": str, "used_jargon": bool}"""
 
+# Post-verdict reinforcement (NOT an eval — shown only AFTER the verdict is locked,
+# so it never leaks the answer before judging).
+EXPLAIN_SYS = """Give a concise, first-principles explanation of the concept, in plain
+language (4-6 sentences). Focus on WHY it must exist and what concretely breaks
+without it — the causal story, not a jargon dump. Write for someone who just tried to
+derive it themselves. Plain text only, no markdown headers."""
+
+
+def explain_concept(concept_prompt):
+    try:
+        r = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": EXPLAIN_SYS},
+                      {"role": "user", "content": f"CONCEPT:\n{concept_prompt}"}],
+            temperature=0.3,
+        )
+        return r.choices[0].message.content.strip()
+    except Exception:
+        return ""
+
 
 def groq_json(system, user):
     r = client.chat.completions.create(
@@ -130,7 +150,7 @@ def stats_html(g):
             f"<div>🏅 Badges: {badges}</div></div>")
 
 
-def result_html(headline, klass, proof, gained, g):
+def result_html(headline, klass, proof, gained, g, explanation=""):
     body = f"<div id='cc-title'>🏁 Round Result</div>"
     body += f"<div class='resultcard {klass}'>"
     body += f"<div class='resulthead'>{headline}</div>"
@@ -139,6 +159,9 @@ def result_html(headline, klass, proof, gained, g):
     if proof:
         body += f"<div class='proof'>“{proof}”</div>"
     body += "</div>"
+    if explanation:
+        body += (f"<div class='explainbox'><div class='explainhead'>📚 The full picture</div>"
+                 f"<div>{explanation}</div></div>")
     return body + stats_html(g)
 
 
@@ -201,7 +224,7 @@ def send(msg, g, chat):
             g["phase"] = "idle"; g["view"] = "result"
             chat.append({"role": "assistant", "content": "✅ Derived on the first try!"})
             res = result_html("✅ Derived on the first try!", "win",
-                              out.get("proof_sentence", ""), 100, g)
+                              out.get("proof_sentence", ""), 100, g, explain_concept(cp))
             return g, chat, stats_md(g), "", res
         g["gap"] = out.get("gap_named", "")
         g["followup"] = out.get("followup", "")
@@ -224,11 +247,13 @@ def send(msg, g, chat):
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
             chat.append({"role": "assistant", "content": "✅ Gap closed!"})
-            res = result_html("✅ Gap closed!", "win", out.get("proof_sentence", ""), 50, g)
+            res = result_html("✅ Gap closed!", "win", out.get("proof_sentence", ""), 50, g,
+                              explain_concept(cp))
         else:
             g["streak"] = 0
             chat.append({"role": "assistant", "content": "❌ Not closed."})
-            res = result_html("❌ Gap not closed — that didn't derive the why.", "lose", "", 0, g)
+            res = result_html("❌ Gap not closed — that didn't derive the why.", "lose", "", 0, g,
+                              explain_concept(cp))
         return g, chat, stats_md(g), "", res
 
     return g, chat, stats_md(g), "", ""
@@ -312,6 +337,9 @@ ul.options li:hover, .options li.selected, .options li.active{
 .resulthead{ font-size:1.6rem; font-weight:700; color:var(--text-main); }
 .xpgain{ font-size:2.2rem; font-weight:800; color:var(--success); margin:8px 0; }
 .proof{ font-style:italic; color:#cfe9ff; margin-top:10px; }
+.explainbox{ background:var(--bg-card); border:1px solid var(--border-glow); border-radius:14px;
+  padding:16px 18px; margin:6px 0 12px; color:#dbe4f0; line-height:1.6; }
+.explainhead{ color:#7df9ff; font-weight:700; margin-bottom:6px; }
 """
 
 THEME = gr.themes.Base(
