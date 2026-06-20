@@ -76,8 +76,9 @@
 ---
 
 ## MOVE 4: DOMAIN MODELLING
-*[paste hand-drawn domain model here → `evidence/move4-data-deterministic.jpg`]*
-*(Schema in `schema.sql`.)*
+*[paste hand-drawn domain model here → `evidence/domainmodel.jpeg`]*
+*[paste hand-drawn data model / schema here → `evidence/datamodel.jpg`]*
+*(Also `evidence/move4-data-deterministic.jpg`; schema in `schema.sql`.)*
 
 Tables: `concepts` (seed) → `sessions` (per learner + concept) → `attempts`. The
 load-bearing link is `attempts.gap_closed` — the named gap to its second-pass result.
