@@ -178,6 +178,34 @@ def socratic_step(concept_prompt, dialogue):
     return groq_json(SOCRATIC_SYS, user)
 
 
+DIAGNOSE_SYS = """The learner could not derive the concept's WHY even after a follow-up.
+Do NOT lecture the full answer. Instead, in plain language:
+1) name the ONE direction / missing link they should think about next, and
+2) list 2-3 specific areas to revisit or improve.
+Return JSON: {"direction": str, "improvements": [str, str, ...]}"""
+
+
+def diagnose_gap(concept_prompt, dialogue):
+    convo = "\n".join(f"{who.capitalize()}: {text}" for who, text in dialogue)
+    try:
+        return groq_json(DIAGNOSE_SYS, f"CONCEPT:\n{concept_prompt}\n\nDIALOGUE:\n{convo}")
+    except Exception:
+        return {"direction": "", "improvements": []}
+
+
+def diagnose_html(diag, g):
+    direction = diag.get("direction", "") or "Think about what concretely breaks without it."
+    imps = diag.get("improvements", []) or []
+    items = "".join(f"<li>{i}</li>" for i in imps)
+    body = ("<div id='cc-title'>🧭 Direction you're missing</div>"
+            "<div class='resultcard lose'>"
+            f"<div style='font-size:1.05rem'>{direction}</div></div>")
+    if items:
+        body += ("<div class='explainbox'><div class='explainhead'>📈 Areas to improve</div>"
+                 f"<ul style='margin:4px 0 0 18px'>{items}</ul></div>")
+    return body + stats_html(g)
+
+
 def groq_json(system, user):
     r = client.chat.completions.create(
         model=MODEL,
@@ -201,7 +229,7 @@ def explain_concept(concept_prompt):
 
 
 # ---------- game state ----------
-MAX_TURNS = 5  # max Socratic questions before revealing
+# One sharp follow-up (per the spec). If still not derived, we diagnose the direction.
 
 
 def new_game():
@@ -240,8 +268,7 @@ def award_milestones(g):
 # every badge in the game + how to earn it (for the hover menu)
 ALL_BADGES = [
     ("🥇 First-Try Genius", "Derive the why on your first explanation"),
-    ("🦉 Socratic Thinker", "Reason to the why through the tutor's questions"),
-    ("⚡ One-Question Wonder", "Derive it after just one Socratic question"),
+    ("🦉 Socratic Thinker", "Close the gap after the tutor's follow-up"),
     ("🧠 No-Jargon Master", "Derive it in plain language, no jargon"),
     ("🔥 Hot Streak", "Win 3 rounds in a row"),
     ("💎 Unstoppable", "Win 5 rounds in a row"),
@@ -402,27 +429,24 @@ def send(msg, g, chat, auth):
             res = result_html("✅ Derived on the first try!", "win",
                               out.get("proof_sentence", ""), 100, g, explain_concept(cp))
             return g, chat, stats_md(g), "", res
-        # begin the Socratic dialogue
+        # ask the ONE sharp follow-up (matches the spec: fail under one follow-up)
         q = out.get("next_question", "") or "Why do you think that has to be the case?"
         g["dialogue"].append(("tutor", q))
         g["turns"] = 1
-        g["phase"] = "socratic"
+        g["phase"] = "await_followup"
         chat.append({"role": "assistant", "content": f"🤔 {q}"})
         return g, chat, stats_md(g), "", ""
 
-    # ----- ongoing Socratic dialogue -----
-    if g["phase"] == "socratic":
+    # ----- answer to the single follow-up: win, or diagnose the direction missed -----
+    if g["phase"] == "await_followup":
         out = socratic_step(cp, g["dialogue"])
         derived = bool(out.get("derived"))
+        g["phase"] = "idle"
         if derived:
-            g["phase"] = "idle"
-            gained = max(40, 90 - 10 * g["turns"])  # fewer questions -> more XP
-            g["xp"] += gained; g["streak"] += 1
+            g["xp"] += 50; g["streak"] += 1
             if g["concept"] not in g["mastered"]:
                 g["mastered"].append(g["concept"])
             add_badge(g, "🦉 Socratic Thinker")
-            if g["turns"] == 1:
-                add_badge(g, "⚡ One-Question Wonder")
             if not out.get("used_jargon"):
                 add_badge(g, "🧠 No-Jargon Master")
             award_milestones(g)
@@ -433,30 +457,22 @@ def send(msg, g, chat, auth):
                         "proof_sentence": out.get("proof_sentence", "")}, token)
             except Exception:
                 pass
-            chat.append({"role": "assistant", "content": "✅ You reasoned your way there!"})
-            res = result_html("✅ You reasoned your way there!", "win",
-                              out.get("proof_sentence", ""), gained, g, explain_concept(cp))
+            chat.append({"role": "assistant", "content": "✅ You closed the gap!"})
+            res = result_html("✅ You closed the gap!", "win",
+                              out.get("proof_sentence", ""), 50, g, explain_concept(cp))
             return g, chat, stats_md(g), "", res
-
-        if g["turns"] >= MAX_TURNS:  # out of questions
-            g["phase"] = "idle"; g["streak"] = 0
-            try:
-                if g.get("attempt_id"):
-                    sb_update("attempts", g["attempt_id"], {
-                        "explanation_2": msg, "gap_closed": False, "proof_sentence": ""}, token)
-            except Exception:
-                pass
-            chat.append({"role": "assistant", "content": "We'll pause here — let's look at it together."})
-            res = result_html("🟡 Not quite — but here's the reasoning.", "lose", "", 0, g,
-                              explain_concept(cp))
-            return g, chat, stats_md(g), "", res
-
-        # ask the next Socratic question
-        q = out.get("next_question", "") or "And why does that matter?"
-        g["dialogue"].append(("tutor", q))
-        g["turns"] += 1
-        chat.append({"role": "assistant", "content": f"🤔 {q}"})
-        return g, chat, stats_md(g), "", ""
+        # not closed after one follow-up -> point at the direction + areas to improve
+        g["streak"] = 0
+        diag = diagnose_gap(cp, g["dialogue"])
+        try:
+            if g.get("attempt_id"):
+                sb_update("attempts", g["attempt_id"], {
+                    "explanation_2": msg, "gap_closed": False, "proof_sentence": ""}, token)
+        except Exception:
+            pass
+        chat.append({"role": "assistant", "content": "🧭 Here's the direction you're missing 👇"})
+        res = diagnose_html(diag, g)
+        return g, chat, stats_md(g), "", res
 
     return g, chat, stats_md(g), "", ""
 
