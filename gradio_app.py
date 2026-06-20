@@ -714,6 +714,10 @@ with gr.Blocks(title="Concept Check — Game") as demo:
         </div>
         """)
         enter_btn = gr.Button("▶  Start Playing", variant="primary")
+        gr.HTML("<div style='text-align:center;margin-top:14px'>"
+                "<a href='/v2' style='display:inline-block;border:1px solid rgba(0,242,254,.5);"
+                "border-radius:999px;padding:8px 16px;color:#7df9ff;font-weight:700;text-decoration:none;"
+                "box-shadow:0 0 16px rgba(0,242,254,.25)'>✨ New game mode: Concept Constellation →</a></div>")
 
     # -------- LOGIN SCREEN (its own page) --------
     with gr.Column(visible=False) as login_view:

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Concept Check — Constellation</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<style>
+  :root{ --bg:#050508; --card:rgba(13,14,24,.78); --glow:rgba(0,242,254,.35);
+         --cyan:#00f2fe; --blue:#4facfe; --ok:#00ff87; --bad:#ff0055; --txt:#e8edf6; --mut:#9fb0c8; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Outfit',system-ui,sans-serif; background:
+        radial-gradient(circle at 12% 12%, rgba(0,242,254,.08), transparent 40%),
+        radial-gradient(circle at 88% 85%, rgba(79,172,254,.08), transparent 40%), var(--bg);
+        color:var(--txt); min-height:100vh; }
+  a{ color:var(--cyan); text-decoration:none; }
+  .hud{ display:flex; align-items:center; gap:16px; padding:12px 20px;
+        border-bottom:1px solid var(--glow); background:rgba(5,5,8,.6); position:sticky; top:0; z-index:10; }
+  .hud h1{ font-size:1.1rem; margin:0; background:linear-gradient(135deg,var(--cyan),var(--blue));
+           -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .hud .spacer{ flex:1; }
+  .chip{ border:1px solid var(--glow); border-radius:999px; padding:4px 12px; font-size:.85rem; }
+  .bar{ height:8px; width:120px; background:#10131f; border-radius:99px; overflow:hidden; display:inline-block; vertical-align:middle; }
+  .bar > i{ display:block; height:100%; background:linear-gradient(90deg,var(--cyan),var(--blue)); }
+  button{ font-family:inherit; cursor:pointer; border-radius:10px; border:1px solid var(--glow);
+          background:rgba(5,5,8,.6); color:var(--cyan); padding:8px 14px; font-weight:600; }
+  button.primary{ background:linear-gradient(135deg,var(--cyan),var(--blue)); color:#001018; border:none;
+                  box-shadow:0 0 16px rgba(0,242,254,.4); }
+  #cy{ width:100%; height:calc(100vh - 58px); }
+  .panel{ position:fixed; top:0; right:0; width:420px; max-width:92vw; height:100vh; z-index:20;
+          background:var(--card); border-left:1px solid var(--glow); box-shadow:-8px 0 40px rgba(0,0,0,.5);
+          transform:translateX(102%); transition:transform .28s ease; display:flex; flex-direction:column; }
+  .panel.open{ transform:translateX(0); }
+  .panel .pad{ padding:18px; overflow-y:auto; }
+  .panel h2{ margin:.2em 0; font-size:1.25rem; }
+  textarea{ width:100%; min-height:96px; background:rgba(5,5,8,.6); color:var(--txt);
+            border:1px solid var(--glow); border-radius:10px; padding:10px; font-family:inherit; }
+  .bubble{ border:1px solid var(--glow); border-radius:12px; padding:10px 12px; margin:8px 0; background:rgba(5,5,8,.4); }
+  .bubble.tutor{ border-color:rgba(0,242,254,.4); } .bubble.you{ border-color:rgba(155,140,255,.4); }
+  .card{ border-radius:16px; padding:18px; margin:10px 0; border:1px solid var(--glow); text-align:center; }
+  .card.win{ background:linear-gradient(160deg,rgba(0,255,135,.15),rgba(0,242,254,.08)); }
+  .card.miss{ background:linear-gradient(160deg,rgba(255,0,85,.15),rgba(127,0,255,.08)); }
+  .big{ font-size:1.4rem; font-weight:800; } .xp{ font-size:2rem; font-weight:800; color:var(--ok); }
+  .mut{ color:var(--mut); } .badge{ display:inline-block; margin:2px; font-size:.9rem; }
+  /* auth overlay */
+  #auth{ position:fixed; inset:0; z-index:50; background:rgba(5,5,8,.92); display:flex;
+         align-items:center; justify-content:center; }
+  #auth .box{ width:360px; max-width:90vw; background:var(--card); border:1px solid var(--glow);
+              border-radius:18px; padding:24px; }
+  #auth input{ width:100%; margin:6px 0; padding:10px; background:rgba(5,5,8,.6); color:var(--txt);
+               border:1px solid var(--glow); border-radius:10px; }
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:60;
+          background:#0a0c18; border:1px solid var(--ok); color:var(--txt); padding:10px 16px;
+          border-radius:12px; box-shadow:0 0 22px rgba(0,255,135,.3); opacity:0; transition:opacity .3s; }
+  .toast.show{ opacity:1; }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+  <!-- AUTH -->
+  <div id="auth">
+    <div class="box">
+      <h2 style="margin-top:0">🌌 Concept Constellation</h2>
+      <p class="mut" style="font-size:.9rem">New here → Sign up. Returning → Sign in. Same account as Classic mode.</p>
+      <input id="email" type="email" placeholder="you@example.com"/>
+      <input id="pw" type="password" placeholder="password (min 6)"/>
+      <div style="display:flex; gap:8px; margin-top:8px">
+        <button class="primary" style="flex:1" onclick="doAuth(false)">🔑 Sign in</button>
+        <button style="flex:1" onclick="doAuth(true)">✨ Sign up</button>
+      </div>
+      <p id="authMsg" class="mut" style="font-size:.85rem"></p>
+      <p style="font-size:.8rem"><a href="/">← Classic mode</a></p>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div class="hud">
+    <h1>🌌 Concept Constellation</h1>
+    <span class="chip" id="lvl">🎮 Novice</span>
+    <span class="chip">⭐ <b id="xp">0</b> XP <span class="bar"><i id="xpbar" style="width:0%"></i></span></span>
+    <span class="chip">🔥 <b id="streak">0</b></span>
+    <span class="chip">🧩 <b id="mcount">0</b>/15</span>
+    <span class="spacer"></span>
+    <span class="mut" id="who"></span>
+    <a class="chip" href="/">← Classic</a>
+    <button onclick="logout()">🚪</button>
+  </div>
+
+  <div id="cy"></div>
+
+  <!-- DERIVATION PANEL -->
+  <div class="panel" id="panel">
+    <div class="pad" id="panelBody"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL="https://laeqihuhaokwnguzdepn.supabase.co";
+const ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZXFpaHVoYW9rd25ndXpkZXBuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTY3ODQsImV4cCI6MjA5NzQ3Mjc4NH0.nWmoMzfdEffmT2AK1wtxdZ0tQZGokDlMcAn9kuoLyPY";
+const sb = supabase.createClient(SUPABASE_URL, ANON);
+
+// concepts (ids match DB 1..15) + prereq (parent) for the tree
+const C = [
+ {id:1, n:"Why a backend?", p:null,  prompt:"Explain from first principles why a backend exists. Why can't everything just run in the browser?"},
+ {id:2, n:"Interface / API", p:1,    prompt:"Explain what an interface is, and what an API is underneath the word — from first principles."},
+ {id:3, n:"Frontend vs backend", p:1,prompt:"What is a frontend, what is a backend, and why do we need both?"},
+ {id:4, n:"DB, not a file", p:1,     prompt:"From first principles, what ways exist to store data, and why do we need a database rather than just a file?"},
+ {id:5, n:"Choosing storage", p:4,   prompt:"How do you choose one storage option over another? Which factors decide it?"},
+ {id:6, n:"Caching", p:1,            prompt:"From first principles, why do systems cache data? What does caching trade off, and what breaks without it?"},
+ {id:7, n:"Rate limits", p:2,        prompt:"Why would a service limit how many requests you can make? What breaks if there were no limit?"},
+ {id:8, n:"HTTPS / encryption", p:2, prompt:"Why encrypt data travelling over the internet? What exactly goes wrong if it's sent in plain text?"},
+ {id:9, n:"Load balancer", p:1,      prompt:"From first principles, why put a load balancer in front of servers? What breaks at scale without one?"},
+ {id:10,n:"DB indexes", p:4,         prompt:"Why does a database need an index? What is the trade-off, and what happens to queries without one?"},
+ {id:11,n:"Queues / async", p:1,     prompt:"Why process some work asynchronously through a queue instead of doing it immediately? What breaks if everything is synchronous?"},
+ {id:12,n:"Statelessness", p:9,      prompt:"What does it mean for a server to be stateless, and why is that useful? What breaks if each server holds its own state?"},
+ {id:13,n:"API versioning", p:2,     prompt:"Why give an API a version? What breaks for existing users if you change an API without versioning?"},
+ {id:14,n:"CDN", p:9,                prompt:"From first principles, why serve content from a CDN? What problem does distance/geography create that a CDN solves?"},
+ {id:15,n:"Password hashing", p:8,   prompt:"Why store a hash of a password rather than the password itself? What exactly is the danger of storing plain passwords?"},
+];
+const byId = Object.fromEntries(C.map(c=>[c.id,c]));
+const LEVELS=[[0,"Novice"],[100,"Apprentice"],[250,"Systems Thinker"],[450,"Architect"],[700,"Systems Sage"],[1000,"Grandmaster"]];
+
+let TOKEN=null, EMAIL=null, mastered=new Set(), cy=null, cur=null, state={};
+
+// ---------- auth ----------
+async function doAuth(signup){
+  const email=document.getElementById("email").value, pw=document.getElementById("pw").value;
+  if(!email||!pw){ msg("enter email + password"); return; }
+  msg(signup?"creating…":"signing in…");
+  const fn = signup ? sb.auth.signUp({email,password:pw}) : sb.auth.signInWithPassword({email,password:pw});
+  const {data,error}=await fn;
+  if(error){ msg("⚠️ "+error.message+(signup?"":" — new here? Sign up.")); return; }
+  let sess = data.session;
+  if(!sess){ // signUp may not return a session — sign in right away
+    const r = await sb.auth.signInWithPassword({email,password:pw});
+    if(r.error){ msg("⚠️ "+r.error.message); return; }
+    sess = r.data.session;
+  }
+  if(!sess){ msg("could not start session"); return; }
+  TOKEN=sess.access_token; EMAIL=sess.user.email;
+  document.getElementById("auth").classList.add("hidden");
+  document.getElementById("who").textContent=EMAIL;
+  await loadProgress(); buildGraph();
+}
+function msg(t){ document.getElementById("authMsg").textContent=t; }
+async function logout(){ await sb.auth.signOut(); location.reload(); }
+
+// ---------- progress ----------
+async function loadProgress(){
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/attempts?select=concept_id,first_pass_closed,gap_closed`,
+            {headers:{apikey:ANON, Authorization:`Bearer ${TOKEN}`}});
+  const rows = await r.json();
+  mastered=new Set(); let ft=0,soc=0;
+  (rows||[]).forEach(a=>{ if(a.first_pass_closed){ft++;mastered.add(a.concept_id);}
+                          else if(a.gap_closed){soc++;mastered.add(a.concept_id);} });
+  const xp=100*ft+60*soc; state.xp=xp; state.badges=[];
+  if(ft)state.badges.push("🥇 First-Try Genius"); if(soc)state.badges.push("🦉 Socratic Thinker");
+  if(mastered.size>=C.length)state.badges.push("🎓 Polymath");
+  renderHud();
+}
+function levelName(xp){ let n="Novice"; LEVELS.forEach(([t,nm])=>{ if(xp>=t)n=nm; }); return n; }
+function renderHud(){
+  const xp=state.xp||0; const nxt=LEVELS.find(([t])=>t>xp);
+  document.getElementById("xp").textContent=xp;
+  document.getElementById("lvl").textContent="🎮 "+levelName(xp);
+  document.getElementById("mcount").textContent=mastered.size;
+  const lo=[...LEVELS].reverse().find(([t])=>xp>=t)[0]; const hi=nxt?nxt[0]:lo;
+  document.getElementById("xpbar").style.width=(nxt?Math.round((xp-lo)/(hi-lo)*100):100)+"%";
+}
+
+// ---------- graph ----------
+function nodeState(c){
+  if(mastered.has(c.id)) return "mastered";
+  if(c.p===null || mastered.has(c.p)) return "open";
+  return "locked";
+}
+function buildGraph(){
+  const els=[];
+  C.forEach(c=> els.push({data:{id:"n"+c.id, label:c.n, st:nodeState(c)}}));
+  C.forEach(c=> { if(c.p!==null) els.push({data:{source:"n"+c.p, target:"n"+c.id}}); });
+  cy = cytoscape({
+    container:document.getElementById("cy"), elements:els,
+    layout:{name:"breadthfirst", directed:true, roots:["n1"], spacingFactor:1.3, padding:30},
+    style:[
+      {selector:"node", style:{ "label":"data(label)","color":"#e8edf6","font-size":"13px",
+        "text-valign":"center","text-halign":"center","text-wrap":"wrap","text-max-width":"90px",
+        "width":86,"height":86,"border-width":2,"background-color":"#10131f","border-color":"#26324a"}},
+      {selector:'node[st="mastered"]', style:{ "background-color":"#06311f","border-color":"#00ff87",
+        "border-width":3,"shadow-blur":24,"shadow-color":"#00ff87","shadow-opacity":0.7}},
+      {selector:'node[st="open"]', style:{ "border-color":"#00f2fe","border-width":3,
+        "background-color":"#0a1a2a","shadow-blur":18,"shadow-color":"#00f2fe","shadow-opacity":0.6}},
+      {selector:'node[st="locked"]', style:{ "opacity":0.45 }},
+      {selector:"edge", style:{ "width":2,"line-color":"#1d3a52","target-arrow-shape":"none",
+        "curve-style":"bezier"}},
+    ],
+  });
+  cy.on("tap","node", e=>{
+    const id=+e.target.id().slice(1), c=byId[id], st=nodeState(c);
+    if(st==="locked"){ toast("🔒 Master "+byId[c.p].n+" first"); return; }
+    openConcept(c);
+  });
+}
+function refreshNodes(){ C.forEach(c=> cy.$("#n"+c.id).data("st", nodeState(c))); }
+
+// ---------- derivation flow ----------
+function openConcept(c){
+  cur={c, exp1:"", followup:""};
+  document.getElementById("panelBody").innerHTML = `
+    <a href="#" onclick="closePanel();return false" class="mut">✕ close</a>
+    <h2>${c.n}</h2>
+    <p class="mut">${c.prompt}</p>
+    <label>Explain it from scratch — build the <i>why</i>:</label>
+    <textarea id="exp"></textarea>
+    <div style="margin-top:8px"><button class="primary" onclick="submitExp1()">Submit</button>
+      <span id="pmsg" class="mut"></span></div>
+    <div id="convo"></div>`;
+  document.getElementById("panel").classList.add("open");
+}
+function closePanel(){ document.getElementById("panel").classList.remove("open"); }
+async function api(path,body){ const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  return r.json(); }
+async function sbInsert(table,payload){ const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,
+  {method:"POST",headers:{apikey:ANON,Authorization:`Bearer ${TOKEN}`,"Content-Type":"application/json","Prefer":"return=representation"},body:JSON.stringify(payload)});
+  const d=await r.json(); return Array.isArray(d)?d[0]:d; }
+async function sbUpdate(table,id,payload){ await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,
+  {method:"PATCH",headers:{apikey:ANON,Authorization:`Bearer ${TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify(payload)}); }
+
+async function submitExp1(){
+  const exp=document.getElementById("exp").value.trim(); if(!exp){return;}
+  document.getElementById("pmsg").textContent="thinking…"; cur.exp1=exp;
+  const out = await api("/api/analyze",{concept_prompt:cur.c.prompt, explanation_1:exp});
+  // persist
+  try{ const s=await sbInsert("sessions",{concept_id:cur.c.id}); cur.sid=s.id;
+    const a=await sbInsert("attempts",{session_id:s.id,concept_id:cur.c.id,explanation_1:exp,
+      first_pass_closed:out.derived,gap_named:"",followup:out.followup||""}); cur.aid=a.id; }catch(e){}
+  document.getElementById("pmsg").textContent="";
+  if(out.derived){ return win(100,"✅ Derived on the first try!", out.proof_sentence, out.explanation, true); }
+  cur.followup=out.followup;
+  document.getElementById("convo").innerHTML = `
+    <div class="bubble you">🧑 ${cur.exp1}</div>
+    <div class="bubble tutor">🤔 ${out.followup}</div>
+    <label>Your answer:</label><textarea id="exp2"></textarea>
+    <div style="margin-top:8px"><button class="primary" onclick="submitExp2()">Send</button>
+      <span id="pmsg2" class="mut"></span></div>`;
+}
+async function submitExp2(){
+  const exp2=document.getElementById("exp2").value.trim(); if(!exp2){return;}
+  document.getElementById("pmsg2").textContent="judging…";
+  const out=await api("/api/judge",{concept_prompt:cur.c.prompt,explanation_1:cur.exp1,followup:cur.followup,explanation_2:exp2});
+  try{ if(cur.aid) await sbUpdate("attempts",cur.aid,{explanation_2:exp2,gap_closed:out.derived,proof_sentence:out.proof_sentence||""}); }catch(e){}
+  document.getElementById("pmsg2").textContent="";
+  if(out.derived){ return win(60,"✅ You closed the gap!", out.proof_sentence, out.explanation, false); }
+  miss(out.diagnose||{});
+}
+function win(xp,head,proof,expl,firsttry){
+  mastered.add(cur.c.id); state.xp=(state.xp||0)+xp; state.streak=(state.streak||0)+1;
+  if(firsttry)addBadge("🥇 First-Try Genius"); else addBadge("🦉 Socratic Thinker");
+  if(mastered.size>=C.length)addBadge("🎓 Polymath");
+  // render the result first so it always shows, then do side-effects
+  document.getElementById("panelBody").innerHTML = `
+    <a href="#" onclick="closePanel();return false" class="mut">✕ close</a>
+    <div class="card win"><div class="big">${head}</div><div class="xp">+${xp} XP</div>
+      ${proof?`<p class="mut"><i>“${proof}”</i></p>`:""}</div>
+    ${expl?`<div class="bubble"><b style="color:var(--cyan)">📚 The full picture</b><p>${expl}</p></div>`:""}
+    <button class="primary" onclick="closePanel()">← back to the map</button>`;
+  try{ renderHud(); refreshNodes(); toast((firsttry?"🥇":"🦉")+" +"+xp+" XP"); }catch(e){}
+}
+function miss(d){
+  state.streak=0;
+  const imps=(d.improvements||[]).map(i=>`<li>${i}</li>`).join("");
+  document.getElementById("panelBody").innerHTML = `
+    <a href="#" onclick="closePanel();return false" class="mut">✕ close</a>
+    <div class="card miss"><div class="big">🧭 Direction you're missing</div>
+      <p>${d.direction||"Think about what concretely breaks without it."}</p></div>
+    ${imps?`<div class="bubble"><b style="color:var(--cyan)">📈 Areas to improve</b><ul>${imps}</ul></div>`:""}
+    <button class="primary" onclick="openConcept(cur.c)">↻ try again</button>
+    <button onclick="closePanel()">← map</button>`;
+}
+function addBadge(b){ state.badges=state.badges||[]; if(!state.badges.includes(b))state.badges.push(b); }
+function toast(t){ const el=document.getElementById("toast"); el.textContent=t; el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"),2200); }
+function confetti(){ /* lightweight: brief glow pulse on the node */
+  if(cur&&cy){ const n=cy.$("#n"+cur.c.id); n.flashClass&&n.flashClass(); } }
+
+// auto-restore session if already logged in
+sb.auth.getSession().then(({data})=>{ if(data.session){ TOKEN=data.session.access_token; EMAIL=data.session.user.email;
+  document.getElementById("auth").classList.add("hidden"); document.getElementById("who").textContent=EMAIL;
+  loadProgress().then(buildGraph); }});
+</script>
+</body>
+</html>
