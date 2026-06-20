@@ -253,11 +253,15 @@ textarea, input[type=text], select, .gradio-container .wrap, .gradio-container .
 #cc-title{ font-size:1.7rem; padding:4px 2px 8px; }
 #hero{ text-align:center; padding:30px 18px 6px; }
 #hero h1{ font-size:2.7rem; margin:0; }
-#hero p{ color:var(--text-muted); font-size:1.05rem; max-width:560px; margin:10px auto; }
+#hero p{ color:#cbd5e1; font-size:1.05rem; max-width:560px; margin:10px auto; }
+/* emphasized words must stay readable (neon highlight, not dim) */
+#hero b, #hero strong, #hero i, #hero em,
+.pitchcard b, .pitchcard strong, .pitchcard i, .pitchcard em{
+  color:#7df9ff !important; font-style:normal; }
 /* cards */
 .pitchcard, #topbar{ background: var(--bg-card); border:1px solid var(--border-glow);
   border-radius:14px; box-shadow: 0 0 18px rgba(0,242,254,0.08); }
-.pitchcard{ padding:16px 18px; margin:10px auto; max-width:620px; color:var(--text-main); }
+.pitchcard{ padding:16px 18px; margin:10px auto; max-width:620px; color:#dbe4f0; line-height:1.6; }
 #topbar{ padding:12px 14px; margin-bottom:12px; }
 .pillrow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:6px 0 2px; }
 .pill{ background:rgba(0,242,254,0.10); border:1px solid var(--border-glow); color:#7df9ff;
