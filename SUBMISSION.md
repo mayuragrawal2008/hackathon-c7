@@ -73,6 +73,39 @@
   required proof-sentence quote, which makes a hollow pass visible on inspection.
   (Jargon is explicitly ignored — the Eddie clause.)
 
+### The exact rules at the boundary
+**Deterministic (rules / code / Postgres) — never an LLM call:**
+- The fixed concept list (shipped as seed data, not generated).
+- Each session and attempt row; the `gap_closed` link; the stored pass/fail verdict.
+- Row-level-security: a row is visible only if `auth.uid() = user_id`.
+- The plain tally of whether the gap closed (the metric).
+
+**Probabilistic (Groq / Llama 3.3) — the only LLM use, governed by fixed rules:**
+1. **Causal-why test** — pass only if the learner states *why it must exist* or *what
+   breaks without it*, as cause → effect.
+2. **Ignore jargon (Eddie clause)** — a correct plain-language answer passes; missing
+   technical vocabulary is NOT a gap.
+3. **No rubber-stamp** — restating the term, defining it, or deflecting ("it's just how
+   it works") is NOT a derivation.
+4. **RIGOR** — an explicit cause→effect link is required ("X, therefore Y, because…"); a
+   vague one-liner does not pass.
+5. **Proof sentence** — the judge must quote the exact sentence justifying its verdict,
+   so a hollow pass is visible. (JSON output, temperature 0.2 for consistency.)
+These run twice: once on the first explanation (`/analyze`) and once after the
+follow-up (`/judge`). Full text in `main.py` / `gradio_app.py`; see `FLOW.md`.
+
+### Beyond the spec: a gamified Socratic experience (demo layer)
+On top of the graded baseline, a second front-end (`gradio-ui` branch,
+https://concept-check-game.onrender.com) turns the same boxed evals into a tutor:
+- **Socratic gap-finding** — instead of one follow-up, a tutor asks **one probing
+  question at a time**, building on each answer, until *the learner* derives the why
+  themselves (max 5 questions, then it reveals the reasoning). The judge of "derived?"
+  is still the same deterministic-boundary eval — gamification never touches the verdict.
+- **Gamification** — XP (+100 first-try, +40–80 Socratic by fewer questions), 6 levels
+  (Novice → Grandmaster), and 7 badges (🥇 First-Try Genius, 🦉 Socratic Thinker,
+  ⚡ One-Question Wonder, 🧠 No-Jargon Master, 🔥 Hot Streak, 💎 Unstoppable, 🎓 Polymath).
+- Same Supabase auth + RLS, so XP/badges/history are private per user and restored on login.
+
 ---
 
 ## MOVE 4: DOMAIN MODELLING
