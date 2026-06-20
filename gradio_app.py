@@ -266,6 +266,8 @@ ul.options, .options, #concept-dd ul{
 ul.options li, .options li{ color: var(--text-main) !important; background: transparent !important; }
 ul.options li:hover, .options li.selected, .options li.active{
   background: rgba(0,242,254,0.18) !important; color:#7df9ff !important; }
+/* my own chatbot caption (replaces the white label pill) */
+.cc-caption{ color:#7df9ff !important; font-weight:700; font-size:1rem; padding:2px 2px 6px; }
 /* readable markdown */
 #cc-stats, #cc-stats *{ color: var(--text-main) !important; }
 /* titles */
@@ -347,7 +349,8 @@ with gr.Blocks(title="Concept Check — Game") as demo:
             start_btn = gr.Button("▶ Start", variant="primary", scale=1)
         with gr.Row():
             with gr.Column(scale=2):
-                chatbot = gr.Chatbot(height=420, label="Quiz-Master", elem_id="cc-chat")
+                gr.HTML("<div class='cc-caption'>💬 Quiz-Master</div>")
+                chatbot = gr.Chatbot(height=420, show_label=False, elem_id="cc-chat")
                 with gr.Row():
                     box = gr.Textbox(placeholder="2) Type your explanation...", scale=4, show_label=False)
                     send_btn = gr.Button("Send", variant="primary", scale=1)
