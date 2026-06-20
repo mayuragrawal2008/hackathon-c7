@@ -560,11 +560,19 @@ textarea, input[type=text], input[type=password], select, .gradio-container .wra
 .gradio-container .block-label{ color:#7df9ff !important; opacity:1 !important; }
 .gradio-container .label-wrap, .gradio-container .block-label{
   background: transparent !important; border: none !important; box-shadow: none !important; }
-ul.options, .options, #concept-dd ul{ background:#0a0c18 !important; color: var(--text-main) !important;
-  border:1px solid var(--border-glow) !important; }
-ul.options li, .options li{ color: var(--text-main) !important; background: transparent !important; }
-ul.options li:hover, .options li.selected, .options li.active{
-  background: rgba(0,242,254,0.18) !important; color:#7df9ff !important; }
+/* dropdown options popup — force OPAQUE (it was inheriting transparent .block bg) */
+.gradio-container ul.options, .gradio-container .options, #concept-dd ul,
+.gradio-container [role="listbox"], .gradio-container .dropdown-menu,
+body > .options, body > ul.options{
+  background:#0a0c18 !important; color:#e8edf6 !important; opacity:1 !important;
+  backdrop-filter:none !important; border:1px solid var(--border-glow) !important;
+  box-shadow:0 8px 26px rgba(0,0,0,.6) !important; z-index:60 !important; }
+.gradio-container ul.options li, .gradio-container .options li,
+.gradio-container [role="listbox"] [role="option"]{
+  color:#e8edf6 !important; background:#0a0c18 !important; }
+.gradio-container ul.options li:hover, .gradio-container .options li.selected,
+.gradio-container .options li.active, .gradio-container [role="option"]:hover{
+  background:rgba(0,242,254,0.22) !important; color:#7df9ff !important; }
 .cc-caption{ color:#7df9ff !important; font-weight:700; font-size:1rem; padding:2px 2px 6px; }
 #cc-result{ min-height:10px; }
 .statsbox{ background:var(--bg-card); border:1px solid var(--border-glow); border-radius:12px;
