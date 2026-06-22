@@ -9,7 +9,7 @@ recognize the words for it. It finds the one place an explanation stops being a
 derivation and becomes a memorized label, hands one sharp follow-up, and checks
 whether the learner can then derive the *why*.
 
-**Live app:** https://hackathon-c7.onrender.com
+**Live app:** https://concept-check-game.onrender.com/
 
 ## How it works (the boundary — Move 3)
 - **Deterministic** (Supabase Postgres + RLS): the fixed concept list, every session
